@@ -318,17 +318,25 @@ void mouseMove(int x, int y)
 {
 	if (rotate)
 	{
-		theta += (mouseOldX - x) * 0.01f;
+		if (viewingCamera->Up() == glm::vec3(0.0f, 1.0f, 0.0f))
+		{
+			theta += (mouseOldX - x) * 0.01f;
+		}
+		else
+		{
+			theta -= (mouseOldX - x) * 0.01f;
+		}
 		if (abs(theta) >= 2 * PI)
 		{
 			theta = 0;
 		}
+
 		phi += (mouseOldY - y) * 0.01f;
 		if (abs(phi) >= 2 * PI)
 		{
 			phi = 0;
 		}
-		
+
 		if (abs(phi) >= PI / 2 && abs(phi) <= 3 * PI / 2)
 		{
 			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, -1.0f, 0.0f));
@@ -337,16 +345,15 @@ void mouseMove(int x, int y)
 		{
 			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, 1.0f, 0.0f));
 		}
+
+		mouseOldX = x;
+		mouseOldY = y;
+		float eyeX = radius * sin(theta) * cos(phi);
+		float eyeY = radius * -sin(phi);
+		float eyeZ = radius * cos(theta) * cos(phi);
+
+		((DynamicCamera*)viewingCamera)->SetEyeOffset(glm::vec3(eyeX, eyeY, eyeZ));
 	}
-
-	mouseOldX = x;
-	mouseOldY = y;
-
-	float eyeX = radius * sin(theta) * cos(phi);
-	float eyeY = radius * -sin(phi);
-	float eyeZ = radius * cos(theta) * cos(phi);
-
-	((DynamicCamera*)viewingCamera)->SetEyeOffset(glm::vec3(eyeX, eyeY, eyeZ));
 }
 
 int main(int argc, char* argv[])
