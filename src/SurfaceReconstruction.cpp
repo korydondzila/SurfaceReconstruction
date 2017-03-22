@@ -328,8 +328,15 @@ void mouseMove(int x, int y)
 		{
 			phi = 0;
 		}
-		printf("Theta: %4.4f\n", theta);
-		printf("Phi: %4.4f\n", phi);
+		
+		if (abs(phi) >= PI / 2 && abs(phi) <= 3 * PI / 2)
+		{
+			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, -1.0f, 0.0f));
+		}
+		else if (abs(phi) < PI / 2 || abs(phi) > 3 * PI / 2)
+		{
+			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, 1.0f, 0.0f));
+		}
 	}
 
 	mouseOldX = x;

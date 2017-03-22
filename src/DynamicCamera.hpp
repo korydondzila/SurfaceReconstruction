@@ -56,6 +56,7 @@ public :
     float HeadingOffset() const { return m_fHeadingOffset; }
     void SetHeadingOffset(float offset) { m_fHeadingOffset = offset; }
 	void SetEyeOffset(const glm::vec3& offset);
+	void SetUp(const glm::vec3& up) { m_vUp = up; }
 };
 
 #endif
