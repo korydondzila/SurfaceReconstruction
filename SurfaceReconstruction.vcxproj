@@ -18,6 +18,32 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\BaseEntity.hpp" />
+    <ClInclude Include="src\DynamicCamera.hpp" />
+    <ClInclude Include="src\includes\glmUtils.hpp" />
+    <ClInclude Include="src\includes\includes.hpp" />
+    <ClInclude Include="src\includes\shader.hpp" />
+    <ClInclude Include="src\includes\pointCloudLoader.hpp" />
+    <ClInclude Include="src\Message.hpp" />
+    <ClInclude Include="src\MessageDispatcher.hpp" />
+    <ClInclude Include="src\MessageTypes.hpp" />
+    <ClInclude Include="src\MoveableEntity.hpp" />
+    <ClInclude Include="src\PointCloud.hpp" />
+    <ClInclude Include="src\Scene.hpp" />
+    <ClInclude Include="src\StaticCamera.hpp" />
+    <ClInclude Include="src\StaticEntity.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\BaseEntity.cpp" />
+    <ClCompile Include="src\DynamicCamera.cpp" />
+    <ClCompile Include="src\MessageDispatcher.cpp" />
+    <ClCompile Include="src\PointCloud.cpp" />
+    <ClCompile Include="src\Scene.cpp" />
+    <ClCompile Include="src\StaticCamera.cpp" />
+    <ClCompile Include="src\StaticEntity.cpp" />
+    <ClCompile Include="src\SurfaceReconstruction.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D953BA56-8C81-4445-99A0-8F3209436B23}</ProjectGuid>
     <RootNamespace>SurfaceReconstruction</RootNamespace>
@@ -75,6 +101,9 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>freeglut.lib;glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -109,8 +138,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
