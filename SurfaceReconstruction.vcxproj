@@ -21,7 +21,9 @@
   <ItemGroup>
     <ClInclude Include="src\BaseEntity.hpp" />
     <ClInclude Include="src\DynamicCamera.hpp" />
+    <ClInclude Include="src\Graph.hpp" />
     <ClInclude Include="src\includes\glmUtils.hpp" />
+    <ClInclude Include="src\includes\HuguesHoppe.hpp" />
     <ClInclude Include="src\includes\includes.hpp" />
     <ClInclude Include="src\includes\shader.hpp" />
     <ClInclude Include="src\includes\pointCloudLoader.hpp" />
@@ -30,7 +32,9 @@
     <ClInclude Include="src\MessageTypes.hpp" />
     <ClInclude Include="src\MoveableEntity.hpp" />
     <ClInclude Include="src\PointCloud.hpp" />
+    <ClInclude Include="src\Principal.hpp" />
     <ClInclude Include="src\Scene.hpp" />
+    <ClInclude Include="src\Spatial.hpp" />
     <ClInclude Include="src\StaticCamera.hpp" />
     <ClInclude Include="src\StaticEntity.hpp" />
   </ItemGroup>
@@ -39,7 +43,9 @@
     <ClCompile Include="src\DynamicCamera.cpp" />
     <ClCompile Include="src\MessageDispatcher.cpp" />
     <ClCompile Include="src\PointCloud.cpp" />
+    <ClCompile Include="src\Principal.cpp" />
     <ClCompile Include="src\Scene.cpp" />
+    <ClCompile Include="src\Spatial.cpp" />
     <ClCompile Include="src\StaticCamera.cpp" />
     <ClCompile Include="src\StaticEntity.cpp" />
     <ClCompile Include="src\SurfaceReconstruction.cpp" />

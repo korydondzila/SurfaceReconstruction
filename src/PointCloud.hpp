@@ -25,6 +25,9 @@ private:
     GLuint* m_gliBuffer;
     GLuint* m_gliShaderProgram;
     float m_fBoundingRadius; // Bounding radius of model
+	std::vector<glm::vec3>* m_vPoints; // Points in the point cloud
+	glm::vec3 m_vMinBound; // Minimum bound coordinate
+	glm::vec3 m_vMaxBound; // Maximum bound coordinate
 
     // Initialize and load model
     void Init();
@@ -43,6 +46,10 @@ public:
     GLuint* Buffer() const { return m_gliBuffer; }
     GLuint* ShaderProgram() const { return m_gliShaderProgram; }
     float BoundingRadius() const { return m_fBoundingRadius; }
+	std::vector<glm::vec3>* Points() const { return m_vPoints; }
+	glm::vec3 MinBound() const { return m_vMinBound; }
+	glm::vec3 MaxBound() const { return m_vMaxBound; }
+	void OutputPoints();
 };
 
 #endif

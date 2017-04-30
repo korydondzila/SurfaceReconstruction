@@ -43,6 +43,10 @@ PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 #include "Scene.hpp"
 #include "DynamicCamera.hpp"
 #include "StaticEntity.hpp"
+#include "Spatial.hpp"
+#include "Graph.hpp"
+#include "Principal.hpp"
+using namespace HuguesHoppe;
 
 // constants for models:  file names, vertex count, model display size
 const int nModels = 1;  // number of models in this scene
@@ -57,6 +61,18 @@ GLuint shaderProgram;
 GLuint MVP, NormalMatrix, ModelView;  // Model View Projection matrix's handle
 GLuint VAO[nModels], buffer[nModels];
 GLuint vao;
+
+// Point cloud information
+PointCloud* pointCloud;  // The loaded point cloud
+int numVertices; // number of vertices/points
+std::vector<glm::vec3> points;
+std::vector<glm::vec3> pcTPOrig; // Origins of Tangent Planes
+std::vector<glm::vec3> pcTPNorm; // Normals of Tangen Planes
+std::vector<bool> pcTPOrient; // Is tangent plane oriented
+std::unique_ptr<PointSpatial> SPp; // Point spatial partition
+std::unique_ptr<Graph<int>> gpcpseudo; // Vertex graph
+int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
+float samplingd = 0.0f; // Sampling density
 
 // model, view, projection matrices and values to create modelMatrix.
 glm::mat4 modelMatrix;          // set in display()
@@ -136,8 +152,6 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glDepthMask(GL_TRUE);
 	glUseProgram(shaderProgram);
-	glEnable(GL_POINT_SIZE);
-	glPointSize(2.0f);
 
 	// update model matrix
 	for (int id : *scene->DrawableObjects())
@@ -193,6 +207,36 @@ void update(int value)
 	}
 }
 
+// Compute the tangent plane
+void compute_tp(int i, int& n, glm::mat4x3& f)
+{
+	std::vector<glm::vec3> pa;
+	SpatialSearch ss(*SPp, points[i]);
+	for (;;) {
+		assert(!ss.done());
+		float dis2; int pi = ss.next(&dis2);
+		if ((int(pa.size()) >= minkintp && dis2 > square(samplingd)) || int(pa.size()) >= maxkintp) break;
+		pa.push_back(points[pi]);
+		if (pi != i && !gpcpseudo->contains(i, pi)) gpcpseudo->enter_undirected(i, pi);
+	}
+	glm::vec3 eimag;
+	principal_components(pa, f, eimag);
+	n = pa.size();
+}
+
+void process_principal()
+{
+	for_int(i, numVertices)
+	{
+		// Compute tangent plane?
+		int n;
+		glm::mat4x3 f = glm::mat4x3();
+		compute_tp(i, n, f);
+		pcTPOrig[i] = f[3];
+		pcTPNorm[i] = glm::normalize(f[2]);
+	}
+}
+
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
@@ -207,12 +251,34 @@ void init()
 	// Load models
 	for (int i = 0; i < nModels; i++)
 	{
-		new PointCloud(modelFile[i], &VAO[i], &buffer[i], &shaderProgram);
+		pointCloud = new PointCloud(modelFile[i], &VAO[i], &buffer[i], &shaderProgram);
 	}
 
 	StaticEntity* pc = new StaticEntity(scene->GetModel("knot"));
-	sprintf(pointClousdStr, "  Point Cloud %s", pc->ModelFile()->File());
-	sprintf(verticesStr, "  Vertices %i", pc->ModelFile()->Vertices());
+
+	numVertices = pointCloud->Vertices();
+	sprintf(pointClousdStr, "  Point Cloud %s", pointCloud->File());
+	sprintf(verticesStr, "  Vertices %i", numVertices);
+
+	// Initialize tangent plane arrays
+	pcTPOrig = std::vector<glm::vec3>(numVertices);
+	pcTPNorm = std::vector<glm::vec3>(numVertices);
+	pcTPOrient = std::vector<bool>(numVertices, false);
+	showVec3("Min", pointCloud->MinBound());
+	showVec3("Max", pointCloud->MaxBound());
+
+	// Create spatial partition
+	int n = numVertices > 100000 ? 60 : numVertices > 5000 ? 36 : 20;
+	SPp = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
+	points = *(pointCloud->Points());
+	double time = glutGet(GLUT_ELAPSED_TIME);
+	for_int(i, numVertices) { SPp->enter(i, &(points[i])); } // Adds all points to spatial partition
+	double end = glutGet(GLUT_ELAPSED_TIME);
+	printf("Add to Partition: %3f\n", ((end - time) / 1000));
+
+	gpcpseudo = std::make_unique<Graph<int>>();
+	for_int(i, numVertices) { gpcpseudo->enter(i); } // Add point index to graph
+	process_principal();
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
@@ -232,8 +298,8 @@ void init()
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_PROGRAM_POINT_SIZE);
-	glPointSize(1.0);
+	glEnable(GL_POINT_SIZE);
+	glPointSize(2.0);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Finalize scene
@@ -318,6 +384,8 @@ void mouseMove(int x, int y)
 {
 	if (rotate)
 	{
+		// Get theta radians, add when camera is world up
+		// minus when camera is world down (maintains rotation direction)
 		if (viewingCamera->Up() == glm::vec3(0.0f, 1.0f, 0.0f))
 		{
 			theta += (mouseOldX - x) * 0.01f;
@@ -326,17 +394,21 @@ void mouseMove(int x, int y)
 		{
 			theta -= (mouseOldX - x) * 0.01f;
 		}
+
 		if (abs(theta) >= 2 * PI)
 		{
 			theta = 0;
 		}
 
+		// Get phi radians
 		phi += (mouseOldY - y) * 0.01f;
 		if (abs(phi) >= 2 * PI)
 		{
 			phi = 0;
 		}
 
+		// Have camera up be world down if it goes over the top of object
+		// prevents weird flipping
 		if (abs(phi) >= PI / 2 && abs(phi) <= 3 * PI / 2)
 		{
 			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, -1.0f, 0.0f));
@@ -346,8 +418,11 @@ void mouseMove(int x, int y)
 			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, 1.0f, 0.0f));
 		}
 
+		// Update old position
 		mouseOldX = x;
 		mouseOldY = y;
+
+		// Get new position
 		float eyeX = radius * sin(theta) * cos(phi);
 		float eyeY = radius * -sin(phi);
 		float eyeZ = radius * cos(theta) * cos(phi);

@@ -39,10 +39,12 @@ Mike Barnes
 #ifndef __POINT_CLOUD_LOADER__
 #define __POINT_CLOUD_LOADER__
 
+#include "includes.hpp"
+
 inline float* loadPointCloud(char* fileName,
 	GLuint vao, GLuint vbo, GLuint shaderProgram,
 	GLuint vPosition, GLuint vColor, GLuint vNormal,
-	char * shaderVertex, char * shaderColor, char * shaderNormal) 
+	std::vector<glm::vec3>* points, glm::vec3& min, glm::vec3& max) 
 {
 	const int X = 0, Y = 1, Z = 2;
 	FILE * fileIn;
@@ -53,6 +55,9 @@ inline float* loadPointCloud(char* fileName,
 	float maxAxes[3] = { -1000.0f, -1000.0f, -1000.0f }; // maximum lenght of x, y, and z from center
 	int count = 0, vertexCount = 0, normalCount = 0, colorCount = 0;
 	int* nVertices = new int(-1);
+
+	min = glm::vec3(float(INT_MAX));
+	max = glm::vec3(float(INT_MIN));
 
 	// set dynamic array sizes
 	int vec3Size = 0;
@@ -93,11 +98,16 @@ inline float* loadPointCloud(char* fileName,
 				// create vertices and normals
 				// std::abs(....) is used instead of abs(...) because g++ does not provide float abs(float)
 				point = glm::vec3(coord[X], coord[Y], coord[Z]);
+				points->push_back(point);
 				vertex[vertexCount] = glm::vec4(point.x, point.y, point.z, 1.0f);
 				// update maxAxes for model's bounding sphere
-				if (maxAxes[X] < std::abs(coord[X])) maxAxes[X] = std::abs(coord[X]);
-				if (maxAxes[Y] < std::abs(coord[Y])) maxAxes[Y] = std::abs(coord[Y]);
-				if (maxAxes[Z] < std::abs(coord[X])) maxAxes[Z] = std::abs(coord[Z]);
+				for_int(i, 3)
+				{
+					if (maxAxes[i] < std::abs(coord[i])) maxAxes[i] = std::abs(coord[i]);
+					if (min[i] > coord[i]) min[i] = coord[i];
+					if (max[i] < coord[i]) max[i] = coord[i];
+				}
+				
 				vertexCount++;
 				normal[normalCount++] = glm::vec3(0, 0, 1);
 				color[colorCount++] = pColor;
@@ -142,13 +152,13 @@ inline float* loadPointCloud(char* fileName,
 	glBufferSubData(GL_ARRAY_BUFFER, vec4Size, vec4Size, color);
 	glBufferSubData(GL_ARRAY_BUFFER, 2 * vec4Size, vec3Size, normal);
 	// set vertex shader variable handles
-	vPosition = glGetAttribLocation(shaderProgram, shaderVertex);
+	vPosition = glGetAttribLocation(shaderProgram, "vPosition");
 	glEnableVertexAttribArray(vPosition);
 	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
-	vColor = glGetAttribLocation(shaderProgram, shaderColor);
+	vColor = glGetAttribLocation(shaderProgram, "vColor");
 	glEnableVertexAttribArray(vColor);
 	glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vec4Size));
-	vNormal = glGetAttribLocation(shaderProgram, shaderNormal);
+	vNormal = glGetAttribLocation(shaderProgram, "vNormal");
 	glEnableVertexAttribArray(vNormal);
 	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(2 * vec4Size));
 

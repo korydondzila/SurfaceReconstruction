@@ -42,6 +42,11 @@ Mike Barnes
 # include <queue>
 # include <sys/stat.h>
 # include <cstring>
+# include <cassert>
+# include <climits>
+# include <unordered_map>
+# include <memory>
+# include "HuguesHoppe.hpp"
 
 # include <GL/glew.h>
 # include <GL/freeglut.h>
