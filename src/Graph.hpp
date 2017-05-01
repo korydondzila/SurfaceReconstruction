@@ -3,6 +3,7 @@
 #define GRAPH_H
 
 #include "includes\includes.hpp"
+#include "UnionFind.hpp"
 
 namespace HuguesHoppe
 {
@@ -67,11 +68,11 @@ namespace HuguesHoppe
 		class vertices_range
 		{
 		public:
-			vertices_range(const type& t) : _t(t) { }
+			vertices_range(const base& t) : _t(t) { }
 			vertex_iterator begin() const { return vertex_iterator(_t.begin()); }
 			vertex_iterator end() const { return vertex_iterator(_t.end()); }
 		private:
-			const type& _t;
+			const base& _t;
 		};
 	private:
 		base _m;
@@ -107,6 +108,50 @@ namespace HuguesHoppe
 		}
 	}
 
+	// *** Kruskal MST
+
+	// Given a graph gnew consisting solely of vertices, computes the minimum spanning tree of undirectedg over
+	//  the vertices in gnew under the cost metric fdist.  Returns is_connected.
+	// Implementation: Kruskal's algorithm, O(e log(e))
+	//  (Prim's algorithm is recommended when e=~n^2, see below)
+	template<typename T, typename Func = float(const T&, const T&)>
+	bool graph_mst(const Graph<T>& undirectedg, Func fdist, Graph<T>& gnew)
+	{
+		int nv = 0, nebefore = 0;
+		struct tedge { T v1, v2; float w; };
+		std::vector<tedge> tedges = std::vector<tedge>();
+
+		for (const T& v1 : gnew.vertices())
+		{
+			nv++;
+			assert(!gnew.out_degree(v1));
+			for (const T& v2 : undirectedg.edges(v1))
+			{
+				if (v1 < v2) continue;
+				assert(gnew.contains(v2));
+				nebefore++;
+				tedges.push_back(tedge{ v1, v2, fdist(v1, v2) });
+			}
+		}
+
+		std::sort(tedges.begin(), tedges.end(), [](const tedge& a, const tedge& b) { return a.w < b.w; });
+
+		UnionFind<T> uf;
+		int neconsidered = 0, neadded = 0;
+
+		for (const tedge& t : tedges)
+		{
+			neconsidered++;
+			T v1 = t.v1, v2 = t.v2;
+			if (!uf.unify(v1, v2)) continue;
+			gnew.enter_undirected(v1, v2);
+			neadded++;
+			if (neadded == nv - 1) break;
+		}
+
+		printf("graph_mst: %d vertices, %d/%d edges considered, %d output\n", nv, neconsidered, nebefore, neadded);
+		return neadded == nv - 1;
+	}
 } // namespace hh
 
 #endif // GRAPH_H

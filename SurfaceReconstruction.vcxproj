@@ -37,6 +37,7 @@
     <ClInclude Include="src\Spatial.hpp" />
     <ClInclude Include="src\StaticCamera.hpp" />
     <ClInclude Include="src\StaticEntity.hpp" />
+    <ClInclude Include="src\UnionFind.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\BaseEntity.cpp" />

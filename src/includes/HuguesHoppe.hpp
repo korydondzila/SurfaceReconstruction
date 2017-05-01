@@ -1,20 +1,25 @@
 #ifndef HUGUES_HOPPE_H
 #define HUGUES_HOPPE_H
 
-// Derive from this class to disable copy constructor and copy assignment.
-struct noncopyable
+namespace HuguesHoppe
 {
-protected:
-	noncopyable(const noncopyable&) = delete;
-	noncopyable& operator=(const noncopyable&) = delete;
-	noncopyable() = default;
-};
+	// Derive from this class to disable copy constructor and copy assignment.
+	struct noncopyable
+	{
+	protected:
+		noncopyable(const noncopyable&) = delete;
+		noncopyable& operator=(const noncopyable&) = delete;
+		noncopyable() = default;
+	};
 
-// Returns a value times itself.
-template<typename T> constexpr T square(const T& e) { return e*e; }
+	// Returns a value times itself.
+	template<typename T> constexpr T square(const T& e) { return e*e; }
 
-// Avoid warnings of unused variables
-template<typename... A> void dummy_use(const A&...) { } // C++14: "constexpr void dummy_use(" becomes OK
+	// Avoid warnings of unused variables
+	template<typename... A> void dummy_use(const A&...) { } // C++14: "constexpr void dummy_use(" becomes OK
+
+	constexpr float    BIGFLOAT = 1e30f;
+} // namespace HuguesHoppe
 
 #define HH_CAT(a, b) a##b
 #define HH_CAT2(a, b) HH_CAT(a, b)

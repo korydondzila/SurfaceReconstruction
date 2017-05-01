@@ -12,8 +12,6 @@ update speed, toggle axes, and toggle idle function.
 */
 
 #include "includes/includes.hpp"
-#include <string>
-#include <vector>
 
 // Initial gl includes required before wglext.h/glxext.h include
 #ifdef _WIN32
@@ -67,11 +65,13 @@ PointCloud* pointCloud;  // The loaded point cloud
 int numVertices; // number of vertices/points
 std::vector<glm::vec3> points;
 std::vector<glm::vec3> pcTPOrig; // Origins of Tangent Planes
+std::vector<glm::mat4x3> pcTP; // Tangent planes
 std::vector<glm::vec3> pcTPNorm; // Normals of Tangen Planes
 std::vector<bool> pcTPOrient; // Is tangent plane oriented
 std::unique_ptr<PointSpatial> SPp; // Point spatial partition
 std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
-std::unique_ptr<Graph<int>> gpcpseudo; // Vertex graph
+std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
+std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
 
@@ -208,6 +208,160 @@ void update(int value)
 	}
 }
 
+// Compute the tangent plane
+void compute_tp(int i, int& n, glm::mat4x3& f)
+{
+	std::vector<glm::vec3> pa;
+	SpatialSearch ss(*SPp, points[i]);
+	for (;;) {
+		assert(!ss.done());
+		float dis2; int pi = ss.next(&dis2);
+		if ((int(pa.size()) >= minkintp && dis2 > square(samplingd)) || int(pa.size()) >= maxkintp) break;
+		pa.push_back(points[pi]);
+		if (pi != i && !gpcpseudo->contains(i, pi)) gpcpseudo->enter_undirected(i, pi);
+	}
+	glm::vec3 eimag;
+	principal_components(pa, f, eimag);
+	n = pa.size();
+}
+
+void process_principal()
+{
+	for_int(i, numVertices)
+	{
+		// Compute tangent plane?
+		int n;
+		glm::mat4x3 f = glm::mat4x3();
+		compute_tp(i, n, f);
+		pcTP[i] = f;
+		pcTPOrig[i] = f[3];
+		pcTPNorm[i] = glm::normalize(f[2]);
+	}
+}
+
+float pc_corr(int i, int j)
+{
+	if (j == numVertices && i < numVertices) return pc_corr(j, i);
+	assert(i >= 0 && j >= 0 && i <= numVertices && j < numVertices);
+	float vdot, corr;
+
+	if (i == numVertices)
+	{
+		vdot = 1.f;     // single exterior link
+	}
+	else
+	{
+		vdot = glm::dot(pcTPNorm[i], pcTPNorm[j]);
+	}
+	corr = 2.f - std::abs(vdot);
+
+	return corr;
+}
+
+float pc_dot(int i, int j)
+{
+	assert(i >= 0 && j >= 0 && i <= numVertices && j < numVertices);
+	if (i == numVertices)
+	{
+		return pcTPNorm[j][2]<0.f ? -1.f : 1.f;
+	}
+	else
+	{
+		return glm::dot(pcTPNorm[i], pcTPNorm[j]);
+	}
+}
+
+// Propagate orientation along tree gpcpath from vertex i (orig. num) using recursive DFS.
+void propagate_along_path(int i)
+{
+	assert(i >= 0 && i <= numVertices);
+	if (i < numVertices) assert(pcTPOrient[i]);
+	for (int j : gpcpath->edges(i))
+	{
+		assert(j >= 0 && j <= numVertices);
+		if (j == numVertices || pcTPOrient[j]) continue; // immediate caller
+		float corr = pc_dot(i, j);
+		if (corr<0) pcTPNorm[j] = -pcTPNorm[j];
+		pcTPOrient[j] = true;
+		propagate_along_path(j);
+	}
+}
+
+void add_exterior_orientation(const std::set<int>& nodes)
+{
+	// vertex num is a pseudo-node used for outside orientation
+	gpcpseudo->enter(numVertices);
+
+	// add 1 pseudo-edge to point with largest z value
+	float maxz = -BIGFLOAT;
+	int maxi = -1;
+
+	for (int i : nodes)
+	{
+		if (pcTPOrig[i][2]>maxz) { maxz = pcTPOrig[i][2]; maxi = i; }
+	}
+
+	gpcpseudo->enter_undirected(maxi, numVertices);
+}
+
+void remove_exterior_orientation()
+{
+	std::vector<int> ari = std::vector<int>();
+	for (int j : gpcpseudo->edges(numVertices)) { ari.push_back(j); }
+	for (int i : ari) { gpcpseudo->remove_undirected(numVertices, i); }
+	gpcpseudo->remove(numVertices);
+}
+
+void orient_set(const std::set<int>& nodes)
+{
+	printf("component with %d points\n", nodes.size());
+	add_exterior_orientation(nodes);
+	gpcpath = std::make_unique<Graph<int>>();
+	for (int i : nodes) { gpcpath->enter(i); }
+	gpcpath->enter(numVertices);
+	{
+		// must be connected here!
+		assert(graph_mst<int>(*gpcpseudo, pc_corr, *gpcpath));
+	}
+	int nextlink = gpcpath->out_degree(numVertices);
+	if (nextlink>1) printf(" num_exteriorlinks_used=%d\n", nextlink);
+	propagate_along_path(numVertices);
+	gpcpath.reset();
+	remove_exterior_orientation();
+}
+
+void orient_tp()
+{
+	// Now treat each connected component of gpcpseudo separately.
+	std::set<int> setnotvis = std::set<int>();
+	for_int(i, numVertices) { setnotvis.insert(i); }
+
+	while (!setnotvis.empty())
+	{
+		std::set<int> nodes = std::set<int>();
+		std::queue<int> queue = std::queue<int>();
+		int fi = *(setnotvis.begin());
+		nodes.insert(fi);
+		queue.push(fi);
+
+		while (!queue.empty())
+		{
+			int i = queue.front();
+			queue.pop();
+			assert(setnotvis.erase(i));
+
+			for (int j : gpcpseudo->edges(i))
+			{
+				if (nodes.insert(j).second) queue.push(j);
+			}
+		}
+
+		orient_set(nodes);
+	}
+
+	for_int(i, numVertices) { assert(pcTPOrient[i]); }
+}
+
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
@@ -235,6 +389,7 @@ void init()
 	pcTPOrig = std::vector<glm::vec3>(numVertices);
 	pcTPNorm = std::vector<glm::vec3>(numVertices);
 	pcTPOrient = std::vector<bool>(numVertices, false);
+	pcTP = std::vector<glm::mat4x3>(numVertices);
 	showVec3("Min", pointCloud->MinBound());
 	showVec3("Max", pointCloud->MaxBound());
 
@@ -254,6 +409,12 @@ void init()
 
 	SPpc = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
 	for_int(i, numVertices) { SPpc->enter(i, &pcTPOrig[i]); } // Add tp origins to spatial partition
+
+	time = glutGet(GLUT_ELAPSED_TIME);
+	orient_tp(); // Orient tangent planes
+	end = glutGet(GLUT_ELAPSED_TIME);
+	printf("Orient Tangent Planes: %3f\n", ((end - time) / 1000));
+	gpcpseudo.reset();
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
@@ -279,36 +440,6 @@ void init()
 
 	// Finalize scene
 	scene->InitDone();
-}
-
-void process_principal()
-{
-	for_int(i, numVertices)
-	{
-		// Compute tangent plane?
-		int n;
-		glm::mat4x3 f = glm::mat4x3();
-		compute_tp(i, n, f);
-		pcTPOrig[i] = f[3];
-		pcTPNorm[i] = glm::normalize(f[2]);
-	}
-}
-
-// Compute the tangent plane
-void compute_tp(int i, int& n, glm::mat4x3& f)
-{
-	std::vector<glm::vec3> pa;
-	SpatialSearch ss(*SPp, points[i]);
-	for (;;) {
-		assert(!ss.done());
-		float dis2; int pi = ss.next(&dis2);
-		if ((int(pa.size()) >= minkintp && dis2 > square(samplingd)) || int(pa.size()) >= maxkintp) break;
-		pa.push_back(points[pi]);
-		if (pi != i && !gpcpseudo->contains(i, pi)) gpcpseudo->enter_undirected(i, pi);
-	}
-	glm::vec3 eimag;
-	principal_components(pa, f, eimag);
-	n = pa.size();
 }
 
 // Keyboard input
