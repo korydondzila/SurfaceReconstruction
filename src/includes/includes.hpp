@@ -45,6 +45,7 @@ Mike Barnes
 # include <cstring>
 # include <cassert>
 # include <climits>
+# include <cmath>
 # include <unordered_map>
 # include <memory>
 # include "HuguesHoppe.hpp"

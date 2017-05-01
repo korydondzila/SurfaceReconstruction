@@ -47,7 +47,7 @@ PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 using namespace HuguesHoppe;
 
 // constants for models:  file names, vertex count, model display size
-const int nModels = 2;  // number of models in this scene
+const int nModels = 3;  // number of models in this scene
 char * modelFile[nModels] = { "src/knot.pcd" };
 const int nVertices[nModels] = { 1280 };
 char * vertexShaderFile = "src/simpleVertex.glsl";
@@ -74,6 +74,7 @@ std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
+bool showUnorientTP = false, showOrientTP = false;
 
 // model, view, projection matrices and values to create modelMatrix.
 glm::mat4 modelMatrix;          // set in display()
@@ -168,10 +169,16 @@ void display()
 		glBindVertexArray(*(entity->ModelFile()->VAO()));
 		glDrawArrays(GL_POINTS, 0, entity->ModelFile()->Vertices());
 
-		if (true)
+		if (showUnorientTP)
 		{
 			glBindVertexArray(VAO[1]);
-			glDrawArrays(GL_TRIANGLES, 0, 6 * 2);
+			glDrawArrays(GL_TRIANGLES, 0, 6 * numVertices);
+		}
+
+		if (showOrientTP)
+		{
+			glBindVertexArray(VAO[2]);
+			glDrawArrays(GL_TRIANGLES, 0, 6 * numVertices);
 		}
 	}
 
@@ -269,7 +276,7 @@ float pc_dot(int i, int j)
 	assert(i >= 0 && j >= 0 && i <= numVertices && j < numVertices);
 	if (i == numVertices)
 	{
-		return pcTPNorm[j][2]<0.f ? -1.f : 1.f;
+		return pcTPNorm[j][2] < 0.f ? -1.f : 1.f;
 	}
 	else
 	{
@@ -304,7 +311,7 @@ void add_exterior_orientation(const std::set<int>& nodes)
 
 	for (int i : nodes)
 	{
-		if (pcTPOrig[i][2]>maxz) { maxz = pcTPOrig[i][2]; maxi = i; }
+		if (pcTPOrig[i][2] > maxz) { maxz = pcTPOrig[i][2]; maxi = i; }
 	}
 
 	gpcpseudo->enter_undirected(maxi, numVertices);
@@ -368,6 +375,72 @@ void orient_tp()
 	for_int(i, numVertices) { assert(pcTPOrient[i]); }
 }
 
+void makeTangentPlanes(GLuint vao, GLuint vbo)
+{
+	int vec3Size = 6 * numVertices * sizeof(glm::vec3);
+	int vec4Size = 6 * numVertices * sizeof(glm::vec4);
+	glm::vec4* vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
+	glm::vec4* color = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
+	glm::vec3* normal = (glm::vec3 *) calloc(vec3Size, sizeof(glm::vec3));;
+
+	for_int(i, numVertices)
+	{
+		glm::mat4x4 lookAt;
+		glm::vec3 up;
+		float x = pcTPNorm[i].x, y = pcTPNorm[i].y, z = pcTPNorm[i].z;
+		//showVec3("Orig", pcTPOrig[i]);
+		//showVec3("Norm ", pcTPNorm[i]);
+
+		if (abs(x) > abs(y) && abs(x) > abs(z))
+		{
+			up = glm::vec3(0, 1, 0);
+		}
+		else if (abs(y) > abs(x) && abs(y) > abs(z))
+		{
+			up = glm::vec3(0, 0, 1);
+		}
+		else if (abs(z) > abs(x) && abs(z) > abs(y))
+		{
+			up = glm::vec3(0, 1, 0);
+		}
+
+		lookAt = glm::transpose(glm::lookAt(glm::vec3(), pcTPNorm[i], up));
+		glm::mat4 translate = glm::translate(glm::mat4(), pcTPOrig[i]);
+		glm::vec4 ul = translate * lookAt * glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f);
+		glm::vec4 ur = translate * lookAt * glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
+		glm::vec4 ll = translate * lookAt * glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f);
+		glm::vec4 lr = translate * lookAt * glm::vec4(0.5f, -0.5f, 0.0f, 1.0f);
+
+		for_int(j, 6)
+		{
+			vertex[i * 6 + j] = j == 0 ? ul : ((j == 1 || j == 4) ? ur : ((j == 2 || j == 3) ? ll : lr));
+			color[i * 6 + j] = glm::vec4(1, 1, 1, 1);
+			normal[i * 6 + j] = glm::vec3();// pcTPNorm[i]; // If using lighting
+		}
+	}
+
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, 2 * vec4Size + vec3Size, NULL, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, vec4Size, vertex);
+	glBufferSubData(GL_ARRAY_BUFFER, vec4Size, vec4Size, color);
+	glBufferSubData(GL_ARRAY_BUFFER, 2 * vec4Size, vec3Size, normal);
+	// set vertex shader variable handles
+	GLuint vPosition = glGetAttribLocation(shaderProgram, "vPosition");
+	glEnableVertexAttribArray(vPosition);
+	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
+	GLuint vColor = glGetAttribLocation(shaderProgram, "vColor");
+	glEnableVertexAttribArray(vColor);
+	glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vec4Size));
+	GLuint vNormal = glGetAttribLocation(shaderProgram, "vNormal");
+	glEnableVertexAttribArray(vNormal);
+	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(2 * vec4Size));
+
+	free(vertex);
+	free(color);
+	free(normal);
+}
+
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
@@ -388,6 +461,13 @@ void init()
 	StaticEntity* pc = new StaticEntity(scene->GetModel("knot"));
 
 	numVertices = pointCloud->Vertices();
+	//samplingd = INFINITY;
+	//samplingd = numVertices / pointCloud->BoundingRadius();
+	//samplingd = numVertices / (pow(pointCloud->BoundingRadius(), 2));
+	samplingd = 2.f;
+	//samplingd = numVertices / (pow(pointCloud->BoundingRadius(), 3));
+	//samplingd = numVertices / ((4.f / 3.f) * PI * pow(pointCloud->BoundingRadius(), 3));
+	printf("Sampling Density %3f\n", samplingd);
 	sprintf(pointClousdStr, "  Point Cloud %s", pointCloud->File());
 	sprintf(verticesStr, "  Vertices %i", numVertices);
 
@@ -413,78 +493,7 @@ void init()
 	double end = glutGet(GLUT_ELAPSED_TIME);
 	printf("Process Principal: %3f\n", ((end - time) / 1000));
 
-	int vec3Size = 6 * 2 * sizeof(glm::vec3);
-	int vec4Size = 6 * 2 * sizeof(glm::vec4);
-	glm::vec4* vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
-	glm::vec4* color = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
-	glm::vec3* normal = (glm::vec3 *) calloc(vec3Size, sizeof(glm::vec3));;
-
-	for_int(i, 2)
-	{
-		glm::mat4x4 lookAt;
-		glm::vec3 up;
-		float x = pcTPNorm[i].x, y = pcTPNorm[i].y, z = pcTPNorm[i].z;
-		if (i >= 0)
-			showVec3("Norm ", pcTPNorm[i]);
-		if (abs(x) > abs(y) && abs(x) > abs(z))
-		{
-			up = glm::vec3(0, x / abs(x), 0);
-		}
-		else if (abs(y) > abs(x) && abs(y) > abs(z))
-		{
-			up = glm::vec3(y / abs(y), 0, 0);
-		}
-		else if (abs(z) > abs(x) && abs(z) > abs(y))
-		{
-			up = glm::vec3(0, z / abs(z), 0);
-		}
-		showVec3("up", up);
-
-		lookAt = glm::lookAt(glm::vec3(), pcTPNorm[i], up);
-		glm::mat4 translate = glm::translate(glm::mat4(), pcTPOrig[i]);
-		glm::vec4 ul = translate * lookAt * glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f);
-		glm::vec4 ur = translate * lookAt * glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
-		glm::vec4 ll = translate * lookAt * glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f);
-		glm::vec4 lr = translate * lookAt * glm::vec4(0.5f, -0.5f, 0.0f, 1.0f);
-		if (i >= 0)
-		{
-			showMat4("lookAt", lookAt);
-			showMat4("translate", translate);
-			showVec4("ul", ul);
-			showVec4("ur", ur);
-			showVec4("ll", ll);
-			showVec4("lr", lr);
-		}
-
-		for_int(j, 6)
-		{
-			vertex[i + j] = j == 0 ? ul : ((j == 1 || j == 4) ? ur : ((j == 2 || j == 3) ? ll : lr));
-			color[i + j] = glm::vec4(1, 1, 1, 1);
-			normal[i + j] = glm::vec3();// pcTPNorm[i]; // If using lighting
-		}
-	}
-
-	for_int(i, 12)
-	{
-		//showVec4("vertex", vertex[i]);
-	}
-
-	glBindVertexArray(VAO[1]);
-	glBindBuffer(GL_ARRAY_BUFFER, buffer[1]);
-	glBufferData(GL_ARRAY_BUFFER, 2 * vec4Size + vec3Size, NULL, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, vec4Size, vertex);
-	glBufferSubData(GL_ARRAY_BUFFER, vec4Size, vec4Size, color);
-	glBufferSubData(GL_ARRAY_BUFFER, 2 * vec4Size, vec3Size, normal);
-	// set vertex shader variable handles
-	GLuint vPosition = glGetAttribLocation(shaderProgram, "vPosition");
-	glEnableVertexAttribArray(vPosition);
-	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
-	GLuint vColor = glGetAttribLocation(shaderProgram, "vColor");
-	glEnableVertexAttribArray(vColor);
-	glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vec4Size));
-	GLuint vNormal = glGetAttribLocation(shaderProgram, "vNormal");
-	glEnableVertexAttribArray(vNormal);
-	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(2 * vec4Size));
+	makeTangentPlanes(VAO[1], buffer[1]);
 
 	SPpc = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
 	for_int(i, numVertices) { SPpc->enter(i, &pcTPOrig[i]); } // Add tp origins to spatial partition
@@ -494,6 +503,8 @@ void init()
 	end = glutGet(GLUT_ELAPSED_TIME);
 	printf("Orient Tangent Planes: %3f\n", ((end - time) / 1000));
 	gpcpseudo.reset();
+
+	makeTangentPlanes(VAO[2], buffer[2]);
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
@@ -530,6 +541,21 @@ void keyboard(unsigned char key, int x, int y)
 	case 'q':
 	case 'Q':
 		exit(EXIT_SUCCESS);
+		break;
+
+	case '1':
+		showUnorientTP = false;
+		showOrientTP = false;
+		break;
+
+	case '2':
+		showUnorientTP = !showUnorientTP;
+		showOrientTP = false;
+		break;
+
+	case '3':
+		showUnorientTP = false;
+		showOrientTP = !showOrientTP;
 		break;
 
 	case 't':
