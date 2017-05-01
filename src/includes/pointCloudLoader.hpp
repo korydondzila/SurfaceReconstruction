@@ -112,8 +112,7 @@ inline float* loadPointCloud(char* fileName,
 					if (max[i] < coord[i]) max[i] = coord[i];
 				}
 				
-				vertexCount++;
-				if (vertex != NULL) vertex[vertexCount] = glm::vec4(point.x, point.y, point.z, 1.0f);
+				if (vertex != NULL) vertex[vertexCount++] = glm::vec4(point.x, point.y, point.z, 1.0f);
 				if (color != NULL) color[colorCount++] = pColor;
 				if (normal != NULL) normal[normalCount++] = glm::vec3(0, 0, 1);
 				count++;
