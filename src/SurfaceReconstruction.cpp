@@ -70,6 +70,7 @@ std::vector<glm::vec3> pcTPOrig; // Origins of Tangent Planes
 std::vector<glm::vec3> pcTPNorm; // Normals of Tangen Planes
 std::vector<bool> pcTPOrient; // Is tangent plane oriented
 std::unique_ptr<PointSpatial> SPp; // Point spatial partition
+std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
 std::unique_ptr<Graph<int>> gpcpseudo; // Vertex graph
 int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
@@ -207,36 +208,6 @@ void update(int value)
 	}
 }
 
-// Compute the tangent plane
-void compute_tp(int i, int& n, glm::mat4x3& f)
-{
-	std::vector<glm::vec3> pa;
-	SpatialSearch ss(*SPp, points[i]);
-	for (;;) {
-		assert(!ss.done());
-		float dis2; int pi = ss.next(&dis2);
-		if ((int(pa.size()) >= minkintp && dis2 > square(samplingd)) || int(pa.size()) >= maxkintp) break;
-		pa.push_back(points[pi]);
-		if (pi != i && !gpcpseudo->contains(i, pi)) gpcpseudo->enter_undirected(i, pi);
-	}
-	glm::vec3 eimag;
-	principal_components(pa, f, eimag);
-	n = pa.size();
-}
-
-void process_principal()
-{
-	for_int(i, numVertices)
-	{
-		// Compute tangent plane?
-		int n;
-		glm::mat4x3 f = glm::mat4x3();
-		compute_tp(i, n, f);
-		pcTPOrig[i] = f[3];
-		pcTPNorm[i] = glm::normalize(f[2]);
-	}
-}
-
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
@@ -271,14 +242,18 @@ void init()
 	int n = numVertices > 100000 ? 60 : numVertices > 5000 ? 36 : 20;
 	SPp = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
 	points = *(pointCloud->Points());
-	double time = glutGet(GLUT_ELAPSED_TIME);
-	for_int(i, numVertices) { SPp->enter(i, &(points[i])); } // Adds all points to spatial partition
-	double end = glutGet(GLUT_ELAPSED_TIME);
-	printf("Add to Partition: %3f\n", ((end - time) / 1000));
+	for_int(i, numVertices) { SPp->enter(i, &points[i]); } // Adds all points to spatial partition
 
 	gpcpseudo = std::make_unique<Graph<int>>();
 	for_int(i, numVertices) { gpcpseudo->enter(i); } // Add point index to graph
-	process_principal();
+
+	double time = glutGet(GLUT_ELAPSED_TIME);
+	process_principal(); // Compute the tangent planes
+	double end = glutGet(GLUT_ELAPSED_TIME);
+	printf("Process Principal: %3f\n", ((end - time) / 1000));
+
+	SPpc = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
+	for_int(i, numVertices) { SPpc->enter(i, &pcTPOrig[i]); } // Add tp origins to spatial partition
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
@@ -304,6 +279,36 @@ void init()
 
 	// Finalize scene
 	scene->InitDone();
+}
+
+void process_principal()
+{
+	for_int(i, numVertices)
+	{
+		// Compute tangent plane?
+		int n;
+		glm::mat4x3 f = glm::mat4x3();
+		compute_tp(i, n, f);
+		pcTPOrig[i] = f[3];
+		pcTPNorm[i] = glm::normalize(f[2]);
+	}
+}
+
+// Compute the tangent plane
+void compute_tp(int i, int& n, glm::mat4x3& f)
+{
+	std::vector<glm::vec3> pa;
+	SpatialSearch ss(*SPp, points[i]);
+	for (;;) {
+		assert(!ss.done());
+		float dis2; int pi = ss.next(&dis2);
+		if ((int(pa.size()) >= minkintp && dis2 > square(samplingd)) || int(pa.size()) >= maxkintp) break;
+		pa.push_back(points[pi]);
+		if (pi != i && !gpcpseudo->contains(i, pi)) gpcpseudo->enter_undirected(i, pi);
+	}
+	glm::vec3 eimag;
+	principal_components(pa, f, eimag);
+	n = pa.size();
 }
 
 // Keyboard input

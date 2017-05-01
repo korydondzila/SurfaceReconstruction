@@ -81,10 +81,12 @@ public:
     {
         return m_iTimerDelay;
     }
+
     void SetTimerDelay(int delay)
     {
         m_iTimerDelay = delay;
     }
+
     void InitDone()
     {
         m_bInit = false;

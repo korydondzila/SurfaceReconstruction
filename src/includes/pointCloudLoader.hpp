@@ -63,9 +63,9 @@ inline float* loadPointCloud(char* fileName,
 	int vec3Size = 0;
 	int vec4Size = 0;
 	// allocate dynamic arrays
-	glm::vec4 * vertex = NULL;
-	glm::vec4 * color = NULL;
-	glm::vec3 * normal = NULL;
+	glm::vec4* vertex = NULL;
+	glm::vec4* color = NULL;
+	glm::vec3* normal = NULL;
 
 	fileIn = fopen(fileName, "r");
 	if (fileIn != NULL)
@@ -75,7 +75,12 @@ inline float* loadPointCloud(char* fileName,
 			done = false;
 			if (*nVertices == -1)
 			{
-				fscanf(fileIn, "%i", nVertices);
+				if (fscanf(fileIn, "%i", nVertices) == EOF)
+				{
+					printf("loadPointCloud error: no vertices defined %s\n", fileName);
+					float* toReturn = new float[2]{ -1.0f, -1.0f };
+					return toReturn;  // just to satisfy the compiler
+				}
 				vec3Size = *nVertices * sizeof(glm::vec3);
 				vec4Size = *nVertices * sizeof(glm::vec4);
 				vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));
@@ -99,7 +104,6 @@ inline float* loadPointCloud(char* fileName,
 				// std::abs(....) is used instead of abs(...) because g++ does not provide float abs(float)
 				point = glm::vec3(coord[X], coord[Y], coord[Z]);
 				points->push_back(point);
-				vertex[vertexCount] = glm::vec4(point.x, point.y, point.z, 1.0f);
 				// update maxAxes for model's bounding sphere
 				for_int(i, 3)
 				{
@@ -109,8 +113,9 @@ inline float* loadPointCloud(char* fileName,
 				}
 				
 				vertexCount++;
-				normal[normalCount++] = glm::vec3(0, 0, 1);
-				color[colorCount++] = pColor;
+				if (vertex != NULL) vertex[vertexCount] = glm::vec4(point.x, point.y, point.z, 1.0f);
+				if (color != NULL) color[colorCount++] = pColor;
+				if (normal != NULL) normal[normalCount++] = glm::vec3(0, 0, 1);
 				count++;
 			}  // ! done
 			   // create vertexs, normal, color 

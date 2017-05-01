@@ -21,8 +21,11 @@ inline GLchar * readShaderSource(const char *fileName) {
 		while (fgetc(fp) != EOF) shaderLength++;
 		rewind(fp);
 		shaderText = (GLchar *)malloc(shaderLength + 1);
-		if (shaderText != NULL) fread(shaderText, 1, shaderLength, fp);
-		shaderText[shaderLength] = '\0';  // NULL termination
+		if (shaderText != NULL)
+		{
+			fread(shaderText, 1, shaderLength, fp);
+			shaderText[shaderLength] = '\0';  // NULL termination
+		}
 		fclose(fp);
 	}
 	else {
