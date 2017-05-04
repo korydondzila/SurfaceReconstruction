@@ -16,6 +16,17 @@ PointCloud::PointCloud(char* modelFile,
     strncpy(m_cFile, modelFile, size);
 	m_vPoints = new std::vector<glm::vec3>();
     Init();
+
+	// shorten name
+	std::string file = modelFile;
+	size_t f1 = file.find_last_of('/');
+	size_t f2 = file.find_last_of('.');
+	file = file.substr(f1 + 1, f2 - f1 - 1);
+	size = file.size() + 1;
+	delete[] m_cFile;
+	m_cFile = new char[size];
+	strncpy(m_cFile, file.c_str(), size);
+
     Scene::Instance()->AddPointCloud(this);
 }
 

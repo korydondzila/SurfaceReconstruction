@@ -63,7 +63,7 @@ GLuint vao;
 // Point cloud information
 PointCloud* pointCloud;  // The loaded point cloud
 int numVertices; // number of vertices/points
-std::vector<glm::vec3> points;
+std::vector<glm::vec3> points; // The point cloud points
 std::vector<glm::vec3> pcTPOrig; // Origins of Tangent Planes
 std::vector<glm::mat4x3> pcTP; // Tangent planes
 std::vector<glm::vec3> pcTPNorm; // Normals of Tangen Planes
@@ -74,7 +74,7 @@ std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
-bool showUnorientTP = false, showOrientTP = false;
+bool showUnorientTP = false, showOrientTP = false, cullFace = true;
 
 // model, view, projection matrices and values to create modelMatrix.
 glm::mat4 modelMatrix;          // set in display()
@@ -96,7 +96,7 @@ glm::mat4 viewMatrix;  // Current view matrix
 StaticCamera* viewingCamera;  // Current camera
 int mouseOldX = 0, mouseOldY = 0;
 bool rotate = false;
-float theta = 0, phi = 0, radius = 2.0f;
+float theta = 0, phi = 0, radius = 2.1f;
 
 // window title string
 char titleStr[160];
@@ -154,6 +154,8 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glDepthMask(GL_TRUE);
 	glUseProgram(shaderProgram);
+
+
 
 	// update model matrix
 	for (int id : *scene->DrawableObjects())
@@ -238,16 +240,16 @@ void compute_tp(int i, int& n, glm::mat4x3& f)
 	n = pa.size();
 }
 
+// Compute tangent planes for all points
 void process_principal()
 {
 	for_int(i, numVertices)
 	{
-		// Compute tangent plane?
 		int n;
 		glm::mat4x3 f = glm::mat4x3();
 		compute_tp(i, n, f);
 		pcTP[i] = f;
-		pcTPOrig[i] = f[3];
+		pcTPOrig[i] = //f[3];
 		pcTPNorm[i] = glm::normalize(f[2]);
 	}
 }
@@ -271,6 +273,7 @@ float pc_corr(int i, int j)
 	return corr;
 }
 
+// Compute the dot product between two tangent planes
 float pc_dot(int i, int j)
 {
 	assert(i >= 0 && j >= 0 && i <= numVertices && j < numVertices);
@@ -325,6 +328,7 @@ void remove_exterior_orientation()
 	gpcpseudo->remove(numVertices);
 }
 
+// Orient the set of tangent planes (orient surface normals)
 void orient_set(const std::set<int>& nodes)
 {
 	printf("component with %d points\n", nodes.size());
@@ -343,6 +347,7 @@ void orient_set(const std::set<int>& nodes)
 	remove_exterior_orientation();
 }
 
+// Orient each tangent plane, by considering neighbors
 void orient_tp()
 {
 	// Now treat each connected component of gpcpseudo separately.
@@ -375,8 +380,10 @@ void orient_tp()
 	for_int(i, numVertices) { assert(pcTPOrient[i]); }
 }
 
+// Creates the tangent planes for rendering
 void makeTangentPlanes(GLuint vao, GLuint vbo)
 {
+	// Set array sizes
 	int vec3Size = 6 * numVertices * sizeof(glm::vec3);
 	int vec4Size = 6 * numVertices * sizeof(glm::vec4);
 	glm::vec4* vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
@@ -388,37 +395,40 @@ void makeTangentPlanes(GLuint vao, GLuint vbo)
 		glm::mat4x4 lookAt;
 		glm::vec3 up;
 		float x = pcTPNorm[i].x, y = pcTPNorm[i].y, z = pcTPNorm[i].z;
-		//showVec3("Orig", pcTPOrig[i]);
-		//showVec3("Norm ", pcTPNorm[i]);
 
-		if (abs(x) > abs(y) && abs(x) > abs(z))
-		{
-			up = glm::vec3(0, 1, 0);
-		}
-		else if (abs(y) > abs(x) && abs(y) > abs(z))
+		// Make sure up is in correct direction (not colinear)
+		if (abs(y) > abs(x) && abs(y) > abs(z))
 		{
 			up = glm::vec3(0, 0, 1);
 		}
-		else if (abs(z) > abs(x) && abs(z) > abs(y))
+		else
 		{
 			up = glm::vec3(0, 1, 0);
 		}
 
+		// Width/height of plane
+		float size = pointCloud->BoundingRadius() / 10;
+
+		// Lookat rotation matrix and translation matrix
 		lookAt = glm::transpose(glm::lookAt(glm::vec3(), pcTPNorm[i], up));
 		glm::mat4 translate = glm::translate(glm::mat4(), pcTPOrig[i]);
-		glm::vec4 ul = translate * lookAt * glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f);
-		glm::vec4 ur = translate * lookAt * glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
-		glm::vec4 ll = translate * lookAt * glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f);
-		glm::vec4 lr = translate * lookAt * glm::vec4(0.5f, -0.5f, 0.0f, 1.0f);
 
+		// Four corners of plane
+		glm::vec4 ul = translate * lookAt * glm::vec4(-size, size, 0.0f, 1.0f);
+		glm::vec4 ur = translate * lookAt * glm::vec4(size, size, 0.0f, 1.0f);
+		glm::vec4 ll = translate * lookAt * glm::vec4(-size, -size, 0.0f, 1.0f);
+		glm::vec4 lr = translate * lookAt * glm::vec4(size, -size, 0.0f, 1.0f);
+
+		// Set each vertex in correct order
 		for_int(j, 6)
 		{
 			vertex[i * 6 + j] = j == 0 ? ul : ((j == 1 || j == 4) ? ur : ((j == 2 || j == 3) ? ll : lr));
-			color[i * 6 + j] = glm::vec4(1, 1, 1, 1);
+			color[i * 6 + j] = glm::vec4(1, 1, 1, 1); // Using depth coloring
 			normal[i * 6 + j] = glm::vec3();// pcTPNorm[i]; // If using lighting
 		}
 	}
 
+	// Set vertex data
 	glBindVertexArray(vao);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, 2 * vec4Size + vec3Size, NULL, GL_STATIC_DRAW);
@@ -441,9 +451,37 @@ void makeTangentPlanes(GLuint vao, GLuint vbo)
 	free(normal);
 }
 
+// Convert sphere coordinates to cartesian coordinates
+glm::vec3 sphereToCartesian(float rho, float theta, float phi)
+{
+	glm::vec3 point = glm::vec3();
+	point.x = rho * sin(phi) * cos(theta);
+	point.y = rho * sin(phi) * sin(theta);
+	point.z = rho * cos(phi);
+	return point;
+}
+
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
+	// Create random sphere point cloud
+	if (true)
+	{
+		std::vector<glm::vec3> points = std::vector<glm::vec3>();
+		srand((unsigned int)time(NULL));
+		int numPoints = 1000;
+		float rho = 1.0;
+		
+		for_int(i, numPoints)
+		{
+			float theta = 2 * PI * ((float)rand() / RAND_MAX);//random range is 0.0 to 1.0
+			float phi = acos(2.0f * ((float)rand() / RAND_MAX) - 1.0f);
+			glm::vec3 point = sphereToCartesian(rho, theta, phi);
+			points.push_back(point);
+			writePointCloud("src/sphere.pcd", numPoints, points);
+		}
+	}
+
 	// load the shader programs
 	shaderProgram = loadShaders(vertexShaderFile, fragmentShaderFile);
 	glUseProgram(shaderProgram);
@@ -455,19 +493,20 @@ void init()
 	// Load models
 	for (int i = 0; i < 1; i++)
 	{
-		pointCloud = new PointCloud(modelFile[i], &VAO[i], &buffer[i], &shaderProgram);
+		pointCloud = new PointCloud("src/sphere.pcd", &VAO[i], &buffer[i], &shaderProgram);
 	}
 
-	StaticEntity* pc = new StaticEntity(scene->GetModel("knot"));
+	StaticEntity* pc = new StaticEntity(scene->GetModel("sphere"));
 
 	numVertices = pointCloud->Vertices();
-	//samplingd = INFINITY;
+	samplingd = INFINITY;
 	//samplingd = numVertices / pointCloud->BoundingRadius();
 	//samplingd = numVertices / (pow(pointCloud->BoundingRadius(), 2));
-	samplingd = 2.f;
+	//samplingd = 2.f;
 	//samplingd = numVertices / (pow(pointCloud->BoundingRadius(), 3));
 	//samplingd = numVertices / ((4.f / 3.f) * PI * pow(pointCloud->BoundingRadius(), 3));
 	printf("Sampling Density %3f\n", samplingd);
+
 	sprintf(pointClousdStr, "  Point Cloud %s", pointCloud->File());
 	sprintf(verticesStr, "  Vertices %i", numVertices);
 
@@ -493,6 +532,7 @@ void init()
 	double end = glutGet(GLUT_ELAPSED_TIME);
 	printf("Process Principal: %3f\n", ((end - time) / 1000));
 
+	// Create unoriented tangent planes
 	makeTangentPlanes(VAO[1], buffer[1]);
 
 	SPpc = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
@@ -504,7 +544,10 @@ void init()
 	printf("Orient Tangent Planes: %3f\n", ((end - time) / 1000));
 	gpcpseudo.reset();
 
+	// Create oriented tangent planes
 	makeTangentPlanes(VAO[2], buffer[2]);
+
+
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
@@ -543,19 +586,32 @@ void keyboard(unsigned char key, int x, int y)
 		exit(EXIT_SUCCESS);
 		break;
 
-	case '1':
+	case '1': // Point cloud only
 		showUnorientTP = false;
 		showOrientTP = false;
 		break;
 
-	case '2':
+	case '2': // Toggle unoriented TPs
 		showUnorientTP = !showUnorientTP;
 		showOrientTP = false;
 		break;
 
-	case '3':
+	case '3': // Toggle oriented TPs
 		showUnorientTP = false;
 		showOrientTP = !showOrientTP;
+		break;
+
+	case 'c':
+	case 'C': // Toggle culling
+		cullFace = !cullFace;
+		if (cullFace)
+		{
+			glEnable(GL_CULL_FACE);
+		}
+		else
+		{
+			glDisable(GL_CULL_FACE);
+		}
 		break;
 
 	case 't':
@@ -582,6 +638,7 @@ void keyboard(unsigned char key, int x, int y)
 	updateTitle();
 	glutPostRedisplay();
 }
+
 void specialKeys(int key, int x, int y)
 {
 	int modifiers = glutGetModifiers();

@@ -119,6 +119,8 @@ inline float* loadPointCloud(char* fileName,
 			}  // ! done
 			   // create vertexs, normal, color 
 		} // while ! eof
+
+		fclose(fileIn);
 	} // if
 	else // file is null
 	{
@@ -173,6 +175,26 @@ inline float* loadPointCloud(char* fileName,
 	free(normal);
 	float* toReturn = new float[2]{ boundingRadius, (float)*nVertices };
 	return toReturn;  // just to satisfy the compiler
+}
+
+inline bool writePointCloud(char* fileName, int nVertices, const std::vector<glm::vec3>& points)
+{
+	FILE* fileOut;
+	fileOut = fopen(fileName, "w");
+	if (fileOut != NULL)
+	{
+		fprintf(fileOut, "%d\n", nVertices);
+
+		for each (glm::vec3 point in points)
+		{
+			fprintf(fileOut, "%f %f %f\n", point.x, point.y, point.z);
+		}
+
+		fclose(fileOut);
+		return true;
+	}
+
+	return false;
 }
 
 #endif
