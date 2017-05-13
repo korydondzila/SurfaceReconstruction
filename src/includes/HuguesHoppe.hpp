@@ -15,10 +15,90 @@ namespace HuguesHoppe
 	// Returns a value times itself.
 	template<typename T> constexpr T square(const T& e) { return e*e; }
 
+	// Returns v clamped to the range [a, b].
+	template<typename T> constexpr T clamp(const T& v, const T& a, const T& b)
+	{
+		return (assert(!(v < a && v > b)), v < a ? a : v > b ? b : v);
+	}
+
 	// Avoid warnings of unused variables
 	template<typename... A> void dummy_use(const A&...) { } // C++14: "constexpr void dummy_use(" becomes OK
 
 	constexpr float    BIGFLOAT = 1e30f;
+
+	template<typename K, typename V> void get_keys(const std::unordered_map<K, V>& map, std::vector<K>& keys)
+	{
+		std::transform(map.begin(), map.end(), keys.begin(), [](auto pair) {return pair.first; });
+	}
+
+	template<typename K, typename V> void get_values(const std::unordered_map<K, V>& map, std::vector<V>& values)
+	{
+		std::transform(map.begin(), map.end(), values.begin(), [](auto pair) {return pair.second; });
+	}
+
+	// Iterate over both keys and values simultaneously
+	template<typename K, typename V, typename Hash = std::hash<K>, typename Equal = std::equal_to<K>,
+		typename Func = void(const K& key, const V& val)>
+		inline void for_map_key_value(const std::unordered_map<K, V, Hash, Equal>& map, Func func) {
+		for (auto& kv : map) { func(kv.first, kv.second); }
+	}
+
+	template<typename T> struct Vec2
+	{
+		T v1;
+		T v2;
+	public:
+		Vec2() : v1(T()), v2(T()) {}
+		Vec2(const T& v1, const T& v2) : v1(v1), v2(v2) {}
+		T& operator[](const int& k)
+		{
+			return k == 0 ? v1 : v2;
+		}
+
+		const T& operator[](const int& k) const
+		{
+			return k == 0 ? v1 : v2;
+		}
+	};
+
+	template<typename T> struct Vec3
+	{
+		T v1;
+		T v2;
+		T v3;
+	public:
+		Vec3() : v1(T()), v2(T()), v3(T()) {}
+		Vec3(const T& v1, const T& v2, const T& v3) : v1(v1), v2(v2), v3(v3) {}
+		T& operator[](const int& k)
+		{
+			return k == 0 ? v1 : k == 1 ? v2 : v3;
+		}
+
+		const T& operator[](const int& k) const
+		{
+			return k == 0 ? v1 : k == 1 ? v2 : v3;
+		}
+	};
+
+	template<typename T> struct Vec4
+	{
+		T v1;
+		T v2;
+		T v3;
+		T v4;
+	public:
+		Vec4() : v1(T()), v2(T()), v3(T()), v4(T()) {}
+		Vec4(const T& v1, const T& v2, const T& v3, const T& v4) : v1(v1), v2(v2), v3(v3), v4(v4) {}
+		T& operator[](const int& k)
+		{
+			return k == 0 ? v1 : k == 1 ? v2 : k == 2 ? v3 : v4;
+		}
+
+		const T& operator[](const int& k) const
+		{
+			return k == 0 ? v1 : k == 1 ? v2 : k == 2 ? v3 : v4;
+		}
+	};
 } // namespace HuguesHoppe
 
 #define HH_CAT(a, b) a##b

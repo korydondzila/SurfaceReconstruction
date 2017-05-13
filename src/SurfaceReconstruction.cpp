@@ -44,6 +44,7 @@ PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 #include "Spatial.hpp"
 #include "Graph.hpp"
 #include "Principal.hpp"
+#include "Contour.hpp"
 using namespace HuguesHoppe;
 
 // constants for models:  file names, vertex count, model display size
@@ -72,6 +73,7 @@ std::unique_ptr<PointSpatial> SPp; // Point spatial partition
 std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
 std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
+Mesh mesh;
 int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
 bool showUnorientTP = false, showOrientTP = false, cullFace = true;
@@ -380,6 +382,25 @@ void orient_tp()
 	for_int(i, numVertices) { assert(pcTPOrient[i]); }
 }
 
+template<typename Contour> void contour_3D(Contour& contour)
+{
+	/*contour.set_ostream(&std::cout);
+	if (unsigneddis)
+	{
+		Point p = co[0];
+		for_intL(i, 1, num) { if (co[i][2]>p[2]) p = co[i]; }
+		for_int(i, 20)
+		{
+			p[2] += float(i) / gridsize;
+			if (contour.march_from(p)>1) break;
+		}
+	*/
+	//else 
+	//{
+		for_int(i, numVertices) { contour.march_from(pcTPOrig[i]); }
+	//}
+}
+
 // Creates the tangent planes for rendering
 void makeTangentPlanes(GLuint vao, GLuint vbo)
 {
@@ -547,7 +568,8 @@ void init()
 	// Create oriented tangent planes
 	makeTangentPlanes(VAO[2], buffer[2]);
 
-
+	Contour3DMesh contour(2, &mesh);
+	contour_3D(contour);
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);

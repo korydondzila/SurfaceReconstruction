@@ -36,24 +36,6 @@ namespace HuguesHoppe
 
 	using SPriority_Queue = std::priority_queue<PQNode<Node>, std::vector<PQNode<Node>>, cmp>;
 
-	template<typename T> struct Vec2
-	{
-		T v1;
-		T v2;
-	public:
-		Vec2() : v1(T()), v2(T()) {}
-		Vec2(const T& v1, const T& v2) : v1(v1), v2(v2) {}
-		T& operator[](const int& k)
-		{
-			return k == 0 ? v1 : v2;
-		}
-
-		const T& operator[](const int& k) const
-		{
-			return k == 0 ? v1 : v2;
-		}
-	};
-
 	using Ind = glm::ivec3;
 
 	// Spatial data structure for efficient queries like "closest_elements" or "find_elements_intersecting_ray".
@@ -106,42 +88,6 @@ namespace HuguesHoppe
 		std::unordered_map<int, std::vector<Node>> _map; // encoded cube index -> Array
 	};
 
-	// Spatial data structure for point elements indexed by an integer.
-	/*class IPointSpatial : public Spatial {
-	public:
-		IPointSpatial(int gn, CArrayView<Point> arp);
-		~IPointSpatial() { clear(); }
-		void clear() override;
-	private:
-		void add_cell(const Ind& ci, std::priority_queue<int>& pq, const glm::vec3& pcenter, std::set<int>& set) const override;
-		int pq_id(int pqe) const override;
-		const glm::vec3* _pp;
-		std::map<int, std::vector<int>> _map;  // encoded cube index -> Array of point indices
-	};*/
-
-	// Spatial data structure for more general objects.
-	/*template<typename Approx2 = float(const Point& p, Univ id), typename Exact2 = float(const Point& p, Univ id)>
-	class ObjectSpatial : public Spatial {
-	public:
-		ObjectSpatial(int gn) : Spatial(gn) { }
-		~ObjectSpatial() { clear(); }
-		void clear() override { for (auto& cell : _map.values()) { HH_SSTAT(Sospcelln, cell.num()); } }
-		// id!=0
-		// Enter an object that comes with a containment function: the function returns true if the object lies
-		// within a given bounding box.  A starting point is also given.
-		template<typename Func = bool(const Bbox&)> void enter(Univ id, const Point& startp, Func fcontains);
-		// Find the objects that could possibly intersect the segment (p1, p2).
-		// The objects are not returned in the exact order of intersection!
-		// However, once should_stop is set (ftest's return), the procedure
-		// will keep calling ftest with all objects that could be closer.
-		template<typename Func = bool(Univ)> void search_segment(const Point& p1, const Point& p2, Func ftest) const;
-	private:
-		Map<int, Array<Univ>> _map; // encoded cube index -> vector
-		void add_cell(const Ind& ci, Pqueue<Univ>& pq, const Point& pcenter, Set<Univ>& set) const override;
-		void pq_refine(Pqueue<Univ>& pq, const Point& pcenter) const override;
-		Univ pq_id(Univ pqe) const override { return pqe; }
-	};*/
-
 	// Search for nearest element(s) from a given query point.
 	class BSpatialSearch : noncopyable
 	{
@@ -183,13 +129,6 @@ namespace HuguesHoppe
 		return int(f*_gn);
 	}
 
-	/*inline Bbox Spatial::indices_to_bbox(const Ind& ci) const {
-		Bbox bb;
-		bb[0] = indices_to_point(ci);
-		bb[1] = bb[0] + Vector(_gni, _gni, _gni);
-		return bb;
-	}*/
-
 	inline Ind Spatial::decode(int en) const {
 		Ind ci;
 		// Note: k_max_gn implied here.
@@ -215,98 +154,6 @@ namespace HuguesHoppe
 		SpatialSearch(const Spatial& psp, const glm::vec3& pp, float pmaxdis = 10.f) : BSpatialSearch(psp, pp, pmaxdis) { }
 		int next(float* dis2 = nullptr) { return BSpatialSearch::next(dis2); }
 	};
-
-	/*template<typename Approx2, typename Exact2>
-	void ObjectSpatial<Approx2, Exact2>::add_cell(const Ind& ci, std::priority_queue<PQNode<int>>& pq,
-		const glm::vec3& pcenter, std::set<int>& set) const {
-		int en = encode(ci);
-		bool present; auto& cell = _map.retrieve(en, present);
-		if (!present) return;
-		Approx2 approx2;
-		for (int e : cell) {
-			if (!set.add(e)) continue;
-			pq.enter(e, approx2(pcenter, e));
-		}
-	}
-
-	template<typename Approx2, typename Exact2>
-	void ObjectSpatial<Approx2, Exact2>::pq_refine(Pqueue<Univ>& pq, const Point& pcenter) const {
-		Univ id = pq.min();
-		float oldv = pq.min_priority();
-		Exact2 exact2;
-		float newv = exact2(pcenter, id);
-		// This next line forces evaluation of newv-oldv, which avoids a bug
-		//  in VC6 Release mode.
-		if (newv - oldv<-1.f) Warning("something odd?");
-		if (newv == oldv) return;
-		if (newv<oldv - 1e-12f && Warning("newv<oldv")) { SHOW(oldv, newv); }
-		assertx(pq.remove_min() == id);
-		pq.enter(id, newv);
-	}
-
-	template<typename Approx2, typename Exact2> template<typename Func>
-	void ObjectSpatial<Approx2, Exact2>::enter(Univ id, const Point& startp, Func fcontains) {
-		Set<int> set;
-		Queue<int> queue;
-		int ncubes = 0;
-		Ind ci = point_to_indices(startp); assertx(indices_inbounds(ci));
-		int enf = encode(ci);
-		set.enter(enf);
-		queue.enqueue(enf);
-		while (!queue.empty()) {
-			int en = queue.dequeue();
-			ci = decode(en);
-			Bbox bb = indices_to_bbox(ci);
-			if (!fcontains(bb)) {
-				if (en != enf) continue; // for numerics, en==enf special
-			}
-			else {
-				_map[en].push(id);
-				ncubes++;
-			}
-			Vec2<Ind> bi; for_int(c, 3) { bi[0][c] = max(ci[c] - 1, 0); bi[1][c] = min(ci[c] + 1, _gn - 1); }
-			for (const Ind& cit : coordsL(bi[0], bi[1] + 1)) {
-				int enc = encode(cit);
-				if (set.add(enc)) queue.enqueue(enc);
-			}
-		}
-		HH_SSTAT(Sospobcells, ncubes);
-	}
-
-	template<typename Approx2, typename Exact2> template<typename Func>
-	void ObjectSpatial<Approx2, Exact2>::search_segment(const Point& p1, const Point& p2, Func ftest) const {
-		Set<Univ> set;
-		bool should_stop = false;
-		for_int(c, 3) {
-			assertx(p1[c] >= 0.f && p1[c] <= 1.f);
-			assertx(p2[c] >= 0.f && p2[c] <= 1.f);
-		}
-		float maxe = max_abs_element(p2 - p1);
-		int ni = float_to_index(maxe) + 2; // 2 there just to be safe
-		Vector v = (p2 - p1)*((1.f + 1e-7f) / float(ni));
-		Point p = p1;
-		Ind pci = point_to_indices(p);
-		int pen = -1;
-		for (int i = 0; ; i++) {
-			Ind cci = point_to_indices(p);
-			ASSERTX(indices_inbounds(cci));
-			Vec2<Ind> bi; for_int(c, 3) { bi[0][c] = min(cci[c], pci[c]); bi[1][c] = max(cci[c], pci[c]); }
-			for (const Ind& cit : coordsL(bi[0], bi[1] + 1)) {
-				int en = encode(cit);
-				if (en == pen) continue;
-				bool present; auto& cell = _map.retrieve(en, present);
-				if (!present) continue;
-				for (Univ e : cell) {
-					if (set.add(e) && ftest(e)) should_stop = true;
-				}
-			}
-			if (i == ni || should_stop) break;
-			pci = cci;
-			pen = encode(pci);
-			p += v;
-		}
-		if (!should_stop) assertw(!compare(p, p2, 1e-6f));
-	}*/
 
 	// Iterator for traversing the coordinates of a grid. uL[0]<=[0]<uU[0], ..., uL[D-1]<=[D-1]<uU[D-1].
 	template<int D> class CoordL_iterator : public std::iterator<std::forward_iterator_tag, const Ind>
@@ -353,6 +200,6 @@ namespace HuguesHoppe
 		return CoordL_range<D>(uL, uU);
 	}
 
-} // namespace hh
+} // namespace HuguesHoppe
 
 #endif // SPATIAL_H

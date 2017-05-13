@@ -41,11 +41,13 @@ Mike Barnes
 # include <vector>
 # include <iterator>
 # include <queue>
+# include <stack>
 # include <sys/stat.h>
 # include <cstring>
 # include <cassert>
 # include <climits>
 # include <cmath>
+# include <unordered_set>
 # include <unordered_map>
 # include <memory>
 # include "HuguesHoppe.hpp"

@@ -20,13 +20,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\BaseEntity.hpp" />
+    <ClInclude Include="src\Contour.hpp" />
     <ClInclude Include="src\DynamicCamera.hpp" />
+    <ClInclude Include="src\Flags.hpp" />
     <ClInclude Include="src\Graph.hpp" />
     <ClInclude Include="src\includes\glmUtils.hpp" />
     <ClInclude Include="src\includes\HuguesHoppe.hpp" />
     <ClInclude Include="src\includes\includes.hpp" />
     <ClInclude Include="src\includes\shader.hpp" />
     <ClInclude Include="src\includes\pointCloudLoader.hpp" />
+    <ClInclude Include="src\Mesh.hpp" />
     <ClInclude Include="src\Message.hpp" />
     <ClInclude Include="src\MessageDispatcher.hpp" />
     <ClInclude Include="src\MessageTypes.hpp" />
@@ -42,6 +45,7 @@
   <ItemGroup>
     <ClCompile Include="src\BaseEntity.cpp" />
     <ClCompile Include="src\DynamicCamera.cpp" />
+    <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\MessageDispatcher.cpp" />
     <ClCompile Include="src\PointCloud.cpp" />
     <ClCompile Include="src\Principal.cpp" />
