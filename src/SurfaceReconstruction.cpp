@@ -74,7 +74,7 @@ std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
 std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
-int minkintp = 4, maxkintp = 20; // Min/Max number of points in tangent plane
+int minkintp = 4, maxkintp = 20, gridsize = 2; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
 bool showUnorientTP = false, showOrientTP = false, cullFace = true;
 
@@ -382,6 +382,53 @@ void orient_tp()
 	for_int(i, numVertices) { assert(pcTPOrient[i]); }
 }
 
+// Find the closest tangent plane origin and compute the signed distance to that tangent plane.
+// Was: check to see if the projection onto the tangent plane lies farther than samplingd from any data point.
+// Now: check to see if the sample point is farther than samplingd+cube_size from any data point.
+float compute_signed(const glm::vec3& p, glm::vec3& proj)
+{
+	int tpi;
+	{
+		SpatialSearch ss(*SPpc, p);
+		tpi = ss.next();
+	}
+	glm::vec3 vptopc = p - pcTPOrig[tpi];
+	float dis = glm::dot(vptopc, pcTPNorm[tpi]);
+	proj = p - dis * pcTPNorm[tpi];
+	if (proj[0] <= 0 || proj[0] >= 1 || proj[1] <= 0 || proj[1] >= 1 || proj[2] <= 0 || proj[2] >= 1)
+		return k_Contour_undefined;
+	if (1)
+	{
+		// check that projected point is close to a data point
+		SpatialSearch ss(*SPp, proj);
+		float dis2; ss.next(&dis2);
+		if (dis2>square(samplingd)) return k_Contour_undefined;
+	}
+	{
+		// check that grid point is close to a data point
+		SpatialSearch ss(*SPp, p);
+		float dis2; ss.next(&dis2);
+		float grid_diagonal2 = square(1.f / gridsize)*3.f;
+		const float fudge = 1.2f;
+		if (dis2>grid_diagonal2*square(fudge)) return k_Contour_undefined;
+	}
+	return dis;
+}
+
+glm::vec3 build_Point(const glm::vec3& p) { return p; }
+
+struct eval_point
+{
+	float operator()(const glm::vec3& pp) const
+	{
+		glm::vec3 p = build_Point(pp);
+		glm::vec3 proj;
+		float dis = compute_signed(p, proj);
+		if (dis == k_Contour_undefined) return dis;
+		return dis;
+	}
+};
+
 template<typename Contour> void contour_3D(Contour& contour)
 {
 	/*contour.set_ostream(&std::cout);
@@ -568,7 +615,7 @@ void init()
 	// Create oriented tangent planes
 	makeTangentPlanes(VAO[2], buffer[2]);
 
-	Contour3DMesh contour(2, &mesh);
+	Contour3DMesh<eval_point> contour(gridsize, &mesh);
 	contour_3D(contour);
 
 	// Initialize display info

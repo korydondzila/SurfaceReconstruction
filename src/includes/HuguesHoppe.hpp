@@ -43,6 +43,17 @@ namespace HuguesHoppe
 		for (auto& kv : map) { func(kv.first, kv.second); }
 	}
 
+	template<typename T> struct Vec0
+	{
+	public:
+		Vec0() = default;
+		template<typename... Args> Vec0(void*, Args&&... args) noexcept = delete;
+		T* a() noexcept { return nullptr; }
+		const T* a() const noexcept { return nullptr; }
+		T&                 operator[](int) { return *static_cast<T*>(nullptr); }
+		constexpr const T& operator[](int) const { return *static_cast<T*>(nullptr); }
+	};
+
 	template<typename T> struct Vec2
 	{
 		T v1;

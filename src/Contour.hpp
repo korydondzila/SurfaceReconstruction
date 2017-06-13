@@ -18,7 +18,7 @@ namespace HuguesHoppe
 	constexpr float k_Contour_undefined = 1e31f; // represents undefined distance, to introduce surface boundaries
 
 	// Protected content in this class just factors functions common to Contour3DMesh, and Contour3D.
-	class ContourBase
+	template<typename VertexData = Vec0<int>> class ContourBase
 	{
 	public:
 		void set_vertex_tolerance(float tol) // if nonzero, do binary search; tol is absolute distance in domain
@@ -58,7 +58,7 @@ namespace HuguesHoppe
 									 // These cubes are indexed by nodes with indices [0, _gn-1].
 									 // The cube vertices are indexed by nodes with indices [0, _gn].  See get_point().
 									 // So there are no "+.5f" roundings anywhere in the code.
-		struct Node
+		struct Node : VertexData
 		{
 			explicit Node(unsigned pen) : _en(pen) { }
 			enum class ECubestate { nothing, queued, visited };
@@ -170,11 +170,13 @@ namespace HuguesHoppe
 	};
 
 	template<
-		typename Derived = void>
-		class Contour3DBase : public ContourBase
+		typename VertexData = Vec0<int>,
+		typename Derived = void, // for contour_cube()
+		typename Eval = float(const Vec3<float>&)>
+		class Contour3DBase : public ContourBase<VertexData>
 	{
 		protected:
-			using base = ContourBase;
+			using base = ContourBase<VertexData>;
 			using typename base::DPoint;
 			using typename base::IPoint;
 			using typename base::Node;
@@ -186,14 +188,14 @@ namespace HuguesHoppe
 			Derived& derived() { return *static_cast<Derived*>(this); }
 			const Derived& derived() const { return *static_cast<const Derived*>(this); }
 		public:
-			Contour3DBase(int gn, const glm::vec3& eval) : base(gn), _eval(eval) { }
+			Contour3DBase(int gn, Eval eval) : base(gn), _eval(eval) { }
 			~Contour3DBase() { }
 			// ret number of new cubes visited: 0=revisit_cube, 1=no_surf, >1=new
 			int march_from(const DPoint& startp) { return march_from_i(startp); }
 			// call march_from() on all cells near startp; ret num new cubes visited
 			int march_near(const DPoint& startp) { return march_near_i(startp); }
 		protected:
-			glm::vec3 _eval;
+			Eval _eval;
 			using Node222 = Vec2<Vec2<Vec2<Node*>>>;
 			using base::k_not_yet_evaled;
 			//
@@ -246,7 +248,7 @@ namespace HuguesHoppe
 					unsigned en = encode(cc);
 					auto p = _m.insert(Node(en));
 					bool is_new = p.second;
-					Node* n = const_cast<Node*>(*p.first);
+					Node* n = const_cast<Node*>(&*p.first);
 					if (n->_cubestate == base::Node::ECubestate::visited) return 0;
 					bool nothing = n->_cubestate == base::Node::ECubestate::nothing;
 					assert(nothing);
@@ -277,7 +279,7 @@ namespace HuguesHoppe
 					unsigned en = encode(ci);
 					auto p = _m.insert(Node(en));
 					bool is_new = p.second;
-					Node* n = const_cast<Node*>(*p.first);
+					Node* n = const_cast<Node*>(&*p.first);
 					na[i][j][k] = n;
 					if (n->_val == k_not_yet_evaled)
 					{
@@ -292,7 +294,7 @@ namespace HuguesHoppe
 				}
 
 				Node* n = na[0][0][0];
-				bool queued = n->_cubestate == base::Node::ECubestate::queued
+				bool queued = n->_cubestate == base::Node::ECubestate::queued;
 				assert(queued);
 				n->_cubestate = base::Node::ECubestate::visited;
 				if (cundef)
@@ -327,7 +329,7 @@ namespace HuguesHoppe
 						unsigned en = encode(ci);
 						auto p = _m.insert(Node(en));
 						bool is_new = p.second;
-						Node* n2 = const_cast<Node*>(*p.first);
+						Node* n2 = const_cast<Node*>(&*p.first);
 						if (n2->_cubestate == base::Node::ECubestate::nothing)
 						{
 							n2->_cubestate = base::Node::ECubestate::queued;
@@ -338,11 +340,12 @@ namespace HuguesHoppe
 			}
 	};
 
-	class Contour3DMesh : public Contour3DBase<VertexData3DMesh>
+	template<typename Eval = float(const Vec3<float>&)>
+	class Contour3DMesh : public Contour3DBase<VertexData3DMesh, Contour3DMesh<Eval>, Eval>
 	{
-		using base = Contour3DBase<VertexData3DMesh>;
+		using base = Contour3DBase<VertexData3DMesh, Contour3DMesh<Eval>, Eval>;
 		public:
-			Contour3DMesh(int gn, Mesh* pmesh, glm::vec3 eval = glm::vec3())
+			Contour3DMesh(int gn, Mesh* pmesh, Eval eval = Eval())
 				: base(gn, eval), _pmesh(pmesh)
 			{
 				assert(_pmesh);
@@ -600,17 +603,19 @@ namespace HuguesHoppe
 			}
 	};
 
-	class Contour3D : public Contour3DBase<VertexData3DMesh>
+	template<typename Eval = float(const glm::vec3<float>&),
+		typename Contour = float(const std::vector<glm::vec3>&)>
+	class Contour3D : public Contour3DBase<Vec0<int>, Contour3D<Eval, Contour>, Eval>
 	{
-		using base = Contour3DBase<VertexData3DMesh>;
+		using base = Contour3DBase<Vec0<int>, Contour3D<Eval, Contour>, Eval>;
 		public:
-			Contour3D(int gn, std::vector<glm::vec3> contour = std::vector<glm::vec3>(), glm::vec3 eval = glm::vec3())
+			Contour3D(int gn, Contour contour = Contour(), Eval eval = Eval())
 				: base(gn, eval), _contour(contour) {}
 		private:
 			// Need to friend base class for callback access to contour_cube().
 			// friend base; // somehow insufficient on mingw and clang (whereas somehow sufficient in Contour3DMesh)
-			template<typename> friend class Contour3DBase;
-			std::vector<glm::vec3> _contour;
+			template<typename, typename, typename> friend class Contour3DBase;
+			Contour _contour;
 			using typename base::DPoint;
 			using typename base::IPoint;
 			using typename base::Node222;
