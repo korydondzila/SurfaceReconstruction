@@ -30,7 +30,8 @@ namespace HuguesHoppe
 		using DPoint = glm::vec3; // domain point
 		using IPoint = glm::ivec3;   // grid point
 		static constexpr int k_max_gn = 1024; // bits/coordinate==10 for 3D, 16
-		ContourBase(int gn) : _gn(gn), _gni(1.f / gn)
+		ContourBase(int gn, const glm::vec3& min, const glm::vec3& max) : 
+			_gn(gn), _gni(1.f / gn), _boxBounds(Vec2<glm::vec3>(min, max))
 		{
 			assert(_gn > 0);
 			assert(_gn < k_max_gn);  // must leave room for [0.._gn] inclusive
@@ -53,6 +54,7 @@ namespace HuguesHoppe
 
 		int _gn;
 		float _gni;                 // 1.f/_gn
+		Vec2<glm::vec3> _boxBounds;
 		float _vertex_tol{ 0.f };    // note: 0.f is special: infinite tolerance
 									 // Model: the domain [0.f, 1.f]^3 is partitioned into _gn^3 cubes.
 									 // These cubes are indexed by nodes with indices [0, _gn-1].
@@ -181,14 +183,15 @@ namespace HuguesHoppe
 			using typename base::IPoint;
 			using typename base::Node;
 			using base::get_point; using base::cube_inbounds;
-			using base::_gn; using base::k_max_gn;
+			using base::_gn; using base::k_max_gn; using base::_boxBounds;
 			using base::_queue; using base::_m; using base::_tmp_poly;
 			using base::_ncvisited; using base::_ncundef; using base::_ncnothing;
 			using base::_nvevaled; using base::_nvzero; using base::_nvundef;
 			Derived& derived() { return *static_cast<Derived*>(this); }
 			const Derived& derived() const { return *static_cast<const Derived*>(this); }
 		public:
-			Contour3DBase(int gn, Eval eval) : base(gn), _eval(eval) { }
+			Contour3DBase(int gn, const glm::vec3& min, const glm::vec3& max, Eval eval) : 
+				base(gn, min, max), _eval(eval) { }
 			~Contour3DBase() { }
 			// ret number of new cubes visited: 0=revisit_cube, 1=no_surf, >1=new
 			int march_from(const DPoint& startp) { return march_from_i(startp); }
@@ -214,14 +217,14 @@ namespace HuguesHoppe
 			int march_from_i(const DPoint& startp)
 			{
 				// Assert in unit cube, need to change
-				for_int(d, 3) assert(startp[d] >= 0.f && startp[d] <= 1.f);
+				for_int(d, 3) assert(startp[d] >= _boxBounds[0][d] && startp[d] <= _boxBounds[1][d]);
 				IPoint cc; for_int(d, 3) { cc[d] = std::min(int(startp[d] * _gn), _gn - 1); }
 				return march_from_aux(cc);
 			}
 
 			int march_near_i(const DPoint& startp)
 			{
-				for_int(d, 3) assert(startp[d] >= 0.f && startp[d] <= 1.f);
+				for_int(d, 3) assert(startp[d] >= _boxBounds[0][d] && startp[d] <= _boxBounds[1][d]);
 				IPoint cc; for_int(d, 3) { cc[d] = min(int(startp[d] * _gn), _gn - 1); }
 				int ret = 0;
 				IPoint ci;
@@ -345,8 +348,8 @@ namespace HuguesHoppe
 	{
 		using base = Contour3DBase<VertexData3DMesh, Contour3DMesh<Eval>, Eval>;
 		public:
-			Contour3DMesh(int gn, Mesh* pmesh, Eval eval = Eval())
-				: base(gn, eval), _pmesh(pmesh)
+			Contour3DMesh(int gn, const glm::vec3& min, const glm::vec3& max, Mesh* pmesh, Eval eval = Eval())
+				: base(gn, min, max, eval), _pmesh(pmesh)
 			{
 				assert(_pmesh);
 			}
@@ -609,8 +612,8 @@ namespace HuguesHoppe
 	{
 		using base = Contour3DBase<Vec0<int>, Contour3D<Eval, Contour>, Eval>;
 		public:
-			Contour3D(int gn, Contour contour = Contour(), Eval eval = Eval())
-				: base(gn, eval), _contour(contour) {}
+			Contour3D(int gn, const glm::vec3& min, const glm::vec3& max, Contour contour = Contour(), Eval eval = Eval())
+				: base(gn, min, max, eval), _contour(contour) {}
 		private:
 			// Need to friend base class for callback access to contour_cube().
 			// friend base; // somehow insufficient on mingw and clang (whereas somehow sufficient in Contour3DMesh)

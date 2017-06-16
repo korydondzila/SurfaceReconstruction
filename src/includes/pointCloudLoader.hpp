@@ -150,6 +150,11 @@ inline float* loadPointCloud(char* fileName,
 	else
 		printf("loaded %s model with %7.2f bounding radius and %d vertices\n", fileName, boundingRadius, *nVertices);
 
+	//glm::vec3 vectorMinToMax = max - min;
+	//glm::vec3 mid = glm::vec3(vectorMinToMax.x / 2 + min.x, vectorMinToMax.y / 2 + min.y, vectorMinToMax.z / 2 + min.z);
+	//max = glm::normalize(max - mid) * cubeHypotenuse(boundingRadius) + mid;
+	//min = glm::normalize(min - mid) * cubeHypotenuse(boundingRadius) + mid;
+
 	// fill the point cloud's buffer
 	glBindVertexArray(vao);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);

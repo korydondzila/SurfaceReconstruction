@@ -134,4 +134,11 @@ inline bool checkSigns(glm::vec3& v1, glm::vec3& v2)
 		glm::sign(v1N.z) == glm::sign(v2N.z));
 }
 
+// Returns the hypotenuse of a cube
+inline float cubeHypotenuse(const float& side)
+{
+	float hypot = glm::sqrt(2 * glm::pow(side, 2));
+	return glm::sqrt(2 * glm::pow(hypot, 2));
+}
+
 #endif

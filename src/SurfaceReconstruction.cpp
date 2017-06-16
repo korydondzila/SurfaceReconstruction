@@ -615,8 +615,8 @@ void init()
 	// Create oriented tangent planes
 	makeTangentPlanes(VAO[2], buffer[2]);
 
-	Contour3DMesh<eval_point> contour(gridsize, &mesh);
-	contour_3D(contour);
+	//Contour3DMesh<eval_point> contour(gridsize, pointCloud->MinBound(), pointCloud->MaxBound(), &mesh);
+	//contour_3D(contour);
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);

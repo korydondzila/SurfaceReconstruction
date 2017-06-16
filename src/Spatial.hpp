@@ -121,8 +121,8 @@ namespace HuguesHoppe
 
 	inline int Spatial::float_to_index(int axis, float fd) const {
 		float f = fd, min = _boxBounds[0][axis], max = _boxBounds[1][axis];
-		if (f < min + 0.01f) { assert(f >= min); f = min + 0.01f; }
-		if (f >= max - 0.01f) { assert(f <= max); f = max - 0.01f; }
+		if (f <= min + 0.01f) { assert(f >= min - 0.01f); f = min + 0.01f; }
+		if (f >= max - 0.01f) { assert(f <= max + 0.01f); f = max - 0.01f; }
 
 		f = (f - min) / (max - min);
 
