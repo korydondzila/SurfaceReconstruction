@@ -251,7 +251,7 @@ void process_principal()
 		glm::mat4x3 f = glm::mat4x3();
 		compute_tp(i, n, f);
 		pcTP[i] = f;
-		pcTPOrig[i] = //f[3];
+		pcTPOrig[i] = f[3];
 		pcTPNorm[i] = glm::normalize(f[2]);
 	}
 }
@@ -615,8 +615,8 @@ void init()
 	// Create oriented tangent planes
 	makeTangentPlanes(VAO[2], buffer[2]);
 
-	//Contour3DMesh<eval_point> contour(gridsize, pointCloud->MinBound(), pointCloud->MaxBound(), &mesh);
-	//contour_3D(contour);
+	Contour3DMesh<eval_point> contour(gridsize, pointCloud->MinBound(), pointCloud->MaxBound(), &mesh);
+	contour_3D(contour);
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
