@@ -79,8 +79,11 @@ namespace HuguesHoppe
 		bool legal_create_face(std::vector<Vertex> va) const;
 		// die if !legal_create_face()
 		Face create_face(std::vector<Vertex> va) { return create_face_private(_facenum, va); }
-		Face create_face(Vertex v1, Vertex v2, Vertex v3) { std::vector<Vertex> va(3);
-		va.push_back(v1); va.push_back(v2); va.push_back(v3); return create_face(va);
+		Face create_face(Vertex v1, Vertex v2, Vertex v3)
+		{
+			std::vector<Vertex> va(3);
+			va[0] = v1; va[1] = v2; va[2] = v3;
+			return create_face(va);
 		}
 		// always legal
 		virtual void destroy_face(Face f);

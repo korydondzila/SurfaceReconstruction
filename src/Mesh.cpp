@@ -161,7 +161,7 @@ namespace HuguesHoppe
 		assert(hep);               // HH_ASSUME(hep);
 		HEdge helast = hep;
 		for (;;)
-{
+		{
 			HEdge hepp = hep->prev;
 			if (!hepp) break;
 			hepp->next = hep;

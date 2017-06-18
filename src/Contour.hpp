@@ -214,11 +214,22 @@ namespace HuguesHoppe
 				return IPoint(int(en >> 20), int((en >> 10)&((1u << 10) - 1)), int(en&((1u << 10) - 1)));
 			}
 
-			int march_from_i(const DPoint& startp)
+			int float_to_index(int axis, float fd) const
+			{
+				float f = fd, min = _boxBounds[0][axis], max = _boxBounds[1][axis];
+				if (f <= min + 0.01f) { assert(f >= min - 0.01f); f = min + 0.01f; }
+				if (f >= max - 0.01f) { assert(f <= max + 0.01f); f = max - 0.01f; }
+
+				f = (f - min) / (max - min);
+
+				return int(f*_gn);
+			}
+
+			int march_from_i(const DPoint& startp) // BREAKPOINT
 			{
 				// Assert in unit cube, need to change
 				for_int(d, 3) assert(startp[d] >= _boxBounds[0][d] && startp[d] <= _boxBounds[1][d]);
-				IPoint cc; for_int(d, 3) { cc[d] = std::min(int(startp[d] * _gn), _gn - 1); }
+				IPoint cc; for_int(d, 3) { cc[d] = float_to_index(d, startp[d]); }
 				return march_from_aux(cc);
 			}
 
@@ -262,7 +273,7 @@ namespace HuguesHoppe
 				{
 					unsigned en = _queue.front();
 					_queue.pop();
-					consider_cube(en);
+					consider_cube(en); // BREAKPOINT
 				}
 				int cncvisited = _ncvisited - oncvisited;
 				if (cncvisited == 1) _ncnothing++;
@@ -306,7 +317,7 @@ namespace HuguesHoppe
 				}
 				else
 				{
-					derived().contour_cube(cc, na);
+					derived().contour_cube(cc, na); // BREAKPOINT
 				}
 				for_int(d, 3) for_int(i, 2) // push neighbors
 				{
@@ -367,7 +378,7 @@ namespace HuguesHoppe
 			void contour_cube(const IPoint& cc, const Node222& na) 
 			{
 				// Based on Wyvill et al.
-				dummy_use(cc);
+				dummy_use(cc); // BREAKPOINT
 				std::unordered_map<Vertex, Vertex> mapsucc;
 				for_int(d, 3) for_int(v, 2) // examine each of 6 cube faces
 				{
@@ -421,15 +432,16 @@ namespace HuguesHoppe
 						{
 							ie = i3;
 						}
-						Vertex v1 = get_vertex_onedge(naf[i1], naf[i]);
+						Vertex v1 = get_vertex_onedge(naf[i1], naf[i]); // BREAKPOINT
 						Vertex v2 = get_vertex_onedge(naf[ie], naf[mod4(ie + 1)]);
 						mapsucc.emplace(v2, v1);  // to get face order correct
 					}
 				}
-				std::vector<Vertex> va = std::vector<Vertex>();
+				std::vector<Vertex> va(12);
+
 				while (!mapsucc.empty())
 				{
-					Vertex vf = nullptr; int minvi = INT_MAX; // find min to be portable
+					Vertex vf = nullptr; int minvi = INT_MAX; // find min to be portable // BREAKPOINT
 					std::vector<Vertex> keys(mapsucc.size());
 					get_keys(mapsucc, keys);
 					for (Vertex v : keys)
@@ -437,15 +449,18 @@ namespace HuguesHoppe
 						int vi = _pmesh->vertex_id(v);
 						if (vi < minvi) { minvi = vi; vf = v; }
 					}
-					int nv = 0;
-					for (Vertex v = vf; ; )
+					int nv = 0; // BREAKPOINT
+					for (Vertex key = vf; ; )
 					{
-						va[nv++] = v;
-						v = mapsucc.at(v);
-						assert(mapsucc.erase(v));
+						va[nv++] = key;
+						Vertex v = mapsucc.at(key);
+						assert(mapsucc.erase(key));
 						if (v == vf) break;
+						key = v;
 					}
-					Face f = _pmesh->create_face(std::vector<Vertex>(va));
+					va.resize(nv);
+					va.shrink_to_fit();
+					Face f = _pmesh->create_face(std::vector<Vertex>(va)); // BREAKPOINT
 					if (nv>3 && !_big_mesh_faces)
 					{
 						// If 6 or more edges, may have 2 edges on same cube face, then must introduce new vertex to be safe.
@@ -565,7 +580,8 @@ namespace HuguesHoppe
 				if (!(nv > 3)) return true;
 				for_intL(i, 2, nv - 1)
 				{
-					if (!mesh.query_edge(va[0], va[i])) return false;
+					assert(!mesh.query_edge(va[0], va[i]));
+					if (mesh.query_edge(va[0], va[i])) return false;
 				}
 				mesh.destroy_face(f);
 				for_int(i, nv - 2) {
@@ -584,16 +600,14 @@ namespace HuguesHoppe
 			{
 				bool is_new; Vertex* pv;
 				{
-					IPoint cc1 = decode(n1->_en);
+					IPoint cc1 = decode(n1->_en); // BREAKPOINT
 					IPoint cc2 = decode(n2->_en);
 					int d = -1;
 					for_int(c, 3) { if (cc1[c] != cc2[c]) { assert(d < 0); d = c; } }
 					assert(d >= 0);
 					assert(std::abs(cc1[d] - cc2[d]) == 1);
 					Node* n = (cc1[d] < cc2[d]) ? n1 : n2;
-					VertexData3DMesh v;
-					pv = &v._verts[d];
-					//pv = &n->_verts[d];
+					pv = &n->_verts[d];
 					is_new = !*pv;
 				}
 				Vertex& v = *pv;

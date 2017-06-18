@@ -74,7 +74,7 @@ std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
 std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
-int minkintp = 4, maxkintp = 20, gridsize = 2; // Min/Max number of points in tangent plane
+int minkintp = 4, maxkintp = 20, gridsize = 10; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
 bool showUnorientTP = false, showOrientTP = false, cullFace = true;
 

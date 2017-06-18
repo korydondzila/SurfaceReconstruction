@@ -3,31 +3,6 @@
 
 namespace HuguesHoppe
 {
-
-	// Given 10000 random data points uniformly sampled over the unit cube,
-	// find the closest 10 neighbors:
-	// spatialtest -gn ? -pn 10000
-	// average time
-	//      ?       10000           1000
-	//      1       1.1745          .14967
-	//      2       .25267          .05333
-	//      3       .11967          .03883
-	//      4       .07450          .03217
-	//      5       .05583          .02917
-	//      10      .03266          .02517
-	//      20      .02733          .02433
-	//      30      .02500          .02833
-	//      40      .02500          .03550
-	//      50      .02550          .04733
-	//      70      .03067          .08950
-	//      100     .04383          .20933
-	//      200     .18033          1.4403
-	// optimal #cells/point:
-	//              .1-30           .06-40
-	// 
-	// for 100'000 data points, gn=40, time is .03100 (still very good)
-	//                          gn=50, time is .02583
-
 	// *** BPointSpatial
 	void BPointSpatial::clear()
 	{
@@ -58,13 +33,12 @@ namespace HuguesHoppe
 
 	void BPointSpatial::add_cell(const Ind& ci, SPriority_Queue& pq, const glm::vec3& pcenter, std::set<int>&) const
 	{
-		// SHOW("add_cell", ci);
 		int en = encode(ci);
 		bool present = _map.find(en) != _map.end();
 		const std::vector<Node>& cell = _map.find(en)->second;
 		if (!present) return;
-		for (const Node& e : cell) {
-			// SHOW("enter", *e.p, dist2(pcenter, *e.p));
+		for (const Node& e : cell)
+		{
 			PQNode<Node>& node = PQNode<Node>(e, glm::distance2(pcenter, *e.p));
 			pq.push(node);
 		}
@@ -75,55 +49,16 @@ namespace HuguesHoppe
 		return id.id;
 	}
 
-	// *** IPointSpatial
-	/*IPointSpatial::IPointSpatial(int gn, CArrayView<Point> arp) : Spatial(gn), _pp(arp.data())
-	{
-		for_int(i, arp.num()) {
-			Ind ci = point_to_indices(arp[i]); assert(indices_inbounds(ci));
-			int en = encode(ci);
-			_map[en].push(i);       //  first creates empty Array<int> if not present
-		}
-		if (0) for (auto& cell : _map.values()) { cell.shrink_to_fit(); }
-	}
-
-	void IPointSpatial::clear()
-	{
-		_map.clear();
-	}
-
-	void IPointSpatial::add_cell(const Ind& ci, Pqueue<Univ>& pq, const Point& pcenter, std::set<int>&) const
-	{
-		int en = encode(ci);
-		bool present; auto& cell = _map.retrieve(en, present);
-		if (!present) return;
-		for (int i : cell) {
-			pq.enter(Conv<int>::e(i), dist2(pcenter, _pp[i]));
-		}
-	}
-
-	Univ IPointSpatial::pq_id(Univ id) const
-	{
-		return id;
-	}
-	*/
-
 	// *** SpatialSearch
 
 	BSpatialSearch::BSpatialSearch(const Spatial& sp, const glm::vec3& p, float maxdis)
 		: _sp(sp), _pcenter(p), _maxdis(maxdis)
 	{
-		// SHOW("search", p, maxdis);
 		Ind ci = _sp.point_to_indices(_pcenter);
 		assert(_sp.indices_inbounds(ci));
 		for_int(i, 2) for_int(c, 3) { _ssi[i][c] = ci[c]; }
 		consider(ci);
 		get_closest_next_cell();
-	}
-
-	BSpatialSearch::~BSpatialSearch()
-	{
-		//HH_SSTAT(Sssncellsv, _ncellsv);
-		//HH_SSTAT(Sssnelemsv, _nelemsv);
 	}
 
 	bool BSpatialSearch::done()
@@ -158,7 +93,6 @@ namespace HuguesHoppe
 
 	void BSpatialSearch::consider(const Ind& ci)
 	{
-		// SHOW("consider", ci);
 		_ncellsv++;
 		int n = _pq.size();
 		_sp.add_cell(ci, _pq, _pcenter, _setevis);
@@ -185,7 +119,6 @@ namespace HuguesHoppe
 	void BSpatialSearch::expand_search_space()
 	{
 		assert(_axis >= 0 && _axis<3 && _dir >= 0 && _dir <= 1);
-		// SHOW("expand", _axis, _dir, _ssi);
 		Vec2<Ind> bi = _ssi;
 		_ssi[_dir][_axis] += _dir ? 1 : -1;
 		bi[0][_axis] = bi[1][_axis] = _ssi[_dir][_axis];

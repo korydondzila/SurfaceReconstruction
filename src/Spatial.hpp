@@ -59,7 +59,6 @@ namespace HuguesHoppe
 		float index_to_float(int i) const { return i*_gni; }
 		Ind point_to_indices(const glm::vec3& p) const { Ind ci; for_int(c,3) { ci[c] = float_to_index(c, p[c]); } return ci; }
 		glm::vec3 indices_to_point(const Ind& ci) const { glm::vec3 p; for_int(c, 3) { p[c] = index_to_float(ci[c]); } return p; }
-		//Bbox indices_to_bbox(const Ind& ci) const;
 		int encode(const Ind& ci) const { return (ci[0] << 20) | (ci[1] << 10) | ci[2]; } // k_max_gn implied here
 		Ind decode(int en) const;
 		// for BSpatialSearch:
@@ -78,7 +77,6 @@ namespace HuguesHoppe
 		explicit BPointSpatial(int gn, const glm::vec3& min, const glm::vec3& max ) : Spatial(gn, min, max) { }
 		~BPointSpatial() { clear(); }
 		void clear() override;
-		// id!=0
 		void enter(int id, const glm::vec3* pp);  // note: pp not copied, no ownership taken
 		void remove(int id, const glm::vec3* pp); // must exist, else die
 		void shrink_to_fit();                  // often just fragments memory
@@ -94,7 +92,7 @@ namespace HuguesHoppe
 	public:
 		// pmaxdis is only a request, you may get objects that lie farther
 		BSpatialSearch(const Spatial& sp, const glm::vec3& p, float maxdis = 10.f);
-		~BSpatialSearch();
+		~BSpatialSearch() {}
 		bool done();
 		int next(float* dis2 = nullptr); // ret id
 	private:
@@ -119,7 +117,8 @@ namespace HuguesHoppe
 
 	//----------------------------------------------------------------------------
 
-	inline int Spatial::float_to_index(int axis, float fd) const {
+	inline int Spatial::float_to_index(int axis, float fd) const
+	{
 		float f = fd, min = _boxBounds[0][axis], max = _boxBounds[1][axis];
 		if (f <= min + 0.01f) { assert(f >= min - 0.01f); f = min + 0.01f; }
 		if (f >= max - 0.01f) { assert(f <= max + 0.01f); f = max - 0.01f; }
@@ -129,7 +128,8 @@ namespace HuguesHoppe
 		return int(f*_gn);
 	}
 
-	inline Ind Spatial::decode(int en) const {
+	inline Ind Spatial::decode(int en) const
+	{
 		Ind ci;
 		// Note: k_max_gn implied here.
 		ci[2] = en&((1 << 10) - 1);
@@ -162,7 +162,8 @@ namespace HuguesHoppe
 	public:
 		CoordL_iterator(const Ind& uL, const Ind& uU) : _u(uL), _uL(uL), _uU(uU) { }
 		CoordL_iterator(const type& iter) = default;
-		bool operator!=(const type& rhs) const {
+		bool operator!=(const type& rhs) const
+		{
 			assert(rhs._uU == _uU);
 			assert(rhs._u[0] == _uU[0]);
 			return _u[0]<_uU[0];    // quick check against usual end()
@@ -170,7 +171,8 @@ namespace HuguesHoppe
 		const Ind& operator*() const { assert(_u[0]<_uU[0]); return _u; }
 		type& operator++() {
 			assert(_u[0]<_uU[0]);
-			for (int c = D - 1; c>0; --c) {
+			for (int c = D - 1; c>0; --c)
+			{
 				_u[c]++;
 				if (_u[c]<_uU[c]) return *this;
 				_u[c] = _uL[c];
