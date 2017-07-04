@@ -653,8 +653,8 @@ namespace HuguesHoppe
 		HEdge query_hedge(Vertex v1, Vertex v2) const;
 		void enter_hedge(HEdge he, Vertex v1);
 		void remove_hedge(HEdge he, Vertex v1);
-		void create_bogus_hedges(std::vector<HEdge> ar_he);
-		void remove_bogus_hedges(std::vector<HEdge> ar_he);
+		void create_bogus_hedges(std::vector<HEdge>* ar_he);
+		void remove_bogus_hedges(std::vector<HEdge>* ar_he);
 		std::vector<Vertex> gather_edge_coalesce_vertices(Edge e) const;
 	};
 

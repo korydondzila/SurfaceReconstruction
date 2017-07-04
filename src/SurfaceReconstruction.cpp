@@ -74,7 +74,7 @@ std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
 std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
-int minkintp = 4, maxkintp = 20, gridsize = 10; // Min/Max number of points in tangent plane
+int minkintp = 4, maxkintp = 20, gridsize = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
 bool showUnorientTP = false, showOrientTP = false, cullFace = true;
 
@@ -533,7 +533,7 @@ glm::vec3 sphereToCartesian(float rho, float theta, float phi)
 void init()
 {
 	// Create random sphere point cloud
-	if (true)
+	if (false)
 	{
 		std::vector<glm::vec3> points = std::vector<glm::vec3>();
 		srand((unsigned int)time(NULL));
@@ -615,8 +615,11 @@ void init()
 	// Create oriented tangent planes
 	makeTangentPlanes(VAO[2], buffer[2]);
 
+	time = glutGet(GLUT_ELAPSED_TIME);
 	Contour3DMesh<eval_point> contour(gridsize, pointCloud->MinBound(), pointCloud->MaxBound(), &mesh);
 	contour_3D(contour);
+	end = glutGet(GLUT_ELAPSED_TIME);
+	printf("Contour: %3f\n", ((end - time) / 1000));
 
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);

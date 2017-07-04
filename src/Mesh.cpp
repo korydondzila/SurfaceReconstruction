@@ -4,35 +4,6 @@
 
 namespace HuguesHoppe
 {
-
-	//HH_ALLOCATE_POOL(Mesh::MVertex);
-	//HH_ALLOCATE_POOL(Mesh::MFace);
-	//HH_ALLOCATE_POOL(Mesh::MEdge);
-	//HH_ALLOCATE_POOL(Mesh::MHEdge);
-
-	//HH_SAC_INITIALIZATION(Mesh::MVertex);
-	//HH_SAC_INITIALIZATION(Mesh::MFace);
-	//HH_SAC_INITIALIZATION(Mesh::MEdge);
-	//HH_SAC_INITIALIZATION(Mesh::MHEdge);
-
-	// *** MISC
-
-	// Analysis of memory requirement:
-	//
-	//  MVertex: (7+6*2)*4  *1v/v   == 76 bytes/vertex
-	//  MFace:   4*4        *2f/v   == 32 bytes/vertex
-	//  MEdge:   3*4        *3e/v   == 36 bytes/vertex
-	//  MHEdge:  7*4        *6h/v   == 168 bytes/vertex
-	//  id2vertex: 16       *1v/v   == 16 bytes/vertex
-	//  id2face:   16       *2f/v   == 32 bytes/vertex
-	//
-	//  Total:                      == 360 bytes/vertex (+string_info{v,f,e,w})
-	//
-	//  example: mojave_sq600 (360K vertices): 130 MBytes
-	//
-	// (Compare with WMesh: 68 bytes/vertex;  AWMesh:  92 bytes/vertex
-	//  no attribs:  WMesh: 40 bytes/vertex;  AWMesh:  64 bytes/vertex)
-
 	// *** DRAWING
 
 	// Note: changes to mesh go through enter_hedge() and remove_hedge() !
@@ -448,33 +419,6 @@ namespace HuguesHoppe
 		return e;
 	}
 
-	// *** Counting routines
-
-	/*Vertex Mesh::random_vertex(Random& r) const
-	{
-		assert(num_vertices());
-		return _id2vertex.get_random_value(r);
-	}
-
-	Face Mesh::random_face(Random& r) const
-	{
-		assert(num_faces());
-		return _id2face.get_random_value(r);
-	}
-
-	Edge Mesh::random_edge(Random& r) const
-	{
-		Face f = random_face(r);
-		int vi = r.get_unsigned(num_vertices(f));
-		HEdge hef = nullptr;
-		for (HEdge he : corners(f))
-		{
-			if (!vi--) { hef = he; break; }
-		}
-		assert(hef);
-		return hef->edge;
-	}*/
-
 	// *** Mesh operations
 
 	bool Mesh::legal_edge_collapse(Edge e) const
@@ -546,7 +490,7 @@ namespace HuguesHoppe
 		std::vector<HEdge> ar_he;
 		if (he1) ar_he.push_back(he1->prev);
 		if (he2) ar_he.push_back(he2->next);
-		create_bogus_hedges(ar_he);
+		create_bogus_hedges(&ar_he);
 		if (he1)
 		{
 			assert(is_triangle(he1->face));
@@ -568,7 +512,7 @@ namespace HuguesHoppe
 		}
 		// Destroy vertex vt
 		destroy_vertex(vt);
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 	}
 
 	void Mesh::collapse_edge(Edge e)
@@ -586,7 +530,7 @@ namespace HuguesHoppe
 		std::vector<HEdge> ar_he; for (Face f : faces(e))
 		{
 			for (HEdge he : corners(f)) { if (he->edge != e) ar_he.push_back(he); }
-		} create_bogus_hedges(ar_he); // note: temporarily causes mesh.ok() to fail
+		} create_bogus_hedges(&ar_he); // note: temporarily causes mesh.ok() to fail
 									  // Destroy faces
 		destroy_face(f1);
 		if (f2) destroy_face(f2);
@@ -595,7 +539,7 @@ namespace HuguesHoppe
 		// Create new faces
 		create_face(vn, v2, vo1); create_face(vn, vo1, v1);
 		if (vo2) { create_face(vn, v1, vo2); create_face(vn, vo2, v2); }
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 		return vn;
 	}
 
@@ -606,9 +550,9 @@ namespace HuguesHoppe
 		Face f1 = face1(e), f2 = face2(e);
 		Vertex vo1 = side_vertex1(e), vo2 = side_vertex2(e); // implies triangles
 															 // Create bogus hedges if boundaries
-		std::vector<HEdge> ar_he; for (Face f : faces(e))
+		std::vector<HEdge>* ar_he = new std::vector<HEdge>(); for (Face f : faces(e))
 		{
-			for (HEdge he : corners(f)) { ar_he.push_back(he); }
+			for (HEdge he : corners(f)) { ar_he->push_back(he); }
 		} create_bogus_hedges(ar_he);
 		// Destroy faces
 		destroy_face(f1);
@@ -687,7 +631,7 @@ namespace HuguesHoppe
 		std::vector<Vertex> va; get_vertices(f, va);
 		// Create bogus hedges if boundaries
 		std::vector<HEdge> ar_he; for (HEdge he : corners(f)) { ar_he.push_back(he); }
-		create_bogus_hedges(ar_he);
+		create_bogus_hedges(&ar_he);
 		// Destroy face
 		destroy_face(f);
 		// Create new vertex and faces
@@ -696,7 +640,7 @@ namespace HuguesHoppe
 		{
 			create_face(va[i], va[(i + 1) % va.size()], vn);
 		}
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 		return vn;
 	}
 
@@ -709,13 +653,13 @@ namespace HuguesHoppe
 		for (Vertex v = v2; ; ) { va2.push_back(v); if (v == v1) break; v = ccw_vertex(f, v); }
 		// Create bogus hedges if boundaries
 		std::vector<HEdge> ar_he; for (HEdge he : corners(f)) { ar_he.push_back(he); }
-		create_bogus_hedges(ar_he);
+		create_bogus_hedges(&ar_he);
 		// Destroy face
 		destroy_face(f);
 		// Create new faces
 		if (sdebug >= 1) assert(legal_create_face(va1) && legal_create_face(va2));
 		create_face(va1); create_face(va2);
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 		return edge(v1, v2);
 	}
 
@@ -806,14 +750,14 @@ namespace HuguesHoppe
 		std::vector<HEdge> ar_he; for (Face f : faces(e))
 		{
 			for (HEdge he : corners(f)) { ar_he.push_back(he); }
-		} create_bogus_hedges(ar_he);
+		} create_bogus_hedges(&ar_he);
 		// Destroy faces
 		destroy_face(f1);
 		destroy_face(f2);
 		// Create new face
 		if (sdebug >= 1) assert(legal_create_face(va));
 		Face fn = create_face(va);
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 		// Delete any isolated vertices
 		for (Vertex v : va) { vbefore.erase(v); }
 		for (Vertex v : vbefore) { destroy_vertex(v); }
@@ -830,7 +774,7 @@ namespace HuguesHoppe
 		std::vector<HEdge> ar_he; for (Face f : faces(e))
 		{
 			for (HEdge he : corners(f)) { ar_he.push_back(he); }
-		} create_bogus_hedges(ar_he);
+		} create_bogus_hedges(&ar_he);
 		Vertex v1 = vertex1(e), v2 = vertex2(e);
 		Face f1 = face1(e), f2 = face2(e);
 		std::vector<Vertex> va1, va2;
@@ -850,7 +794,7 @@ namespace HuguesHoppe
 		Vertex vn = create_vertex();
 		va1.push_back(vn); f1 = create_face(va1); dummy_use(f1);
 		if (f2) { va2.push_back(vn); f2 = create_face(va2); dummy_use(f2); }
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 		return vn;
 	}
 
@@ -861,7 +805,7 @@ namespace HuguesHoppe
 		std::vector<HEdge> ar_he; for (Face f : fa)
 		{
 			for (HEdge he : corners(f)) { ar_he.push_back(he); }
-		} create_bogus_hedges(ar_he);
+		} create_bogus_hedges(&ar_he);
 		Vec2<std::vector<Vertex>> va;
 		for_int(i, fa.size())
 		{
@@ -874,7 +818,7 @@ namespace HuguesHoppe
 		for_int(i, fa.size()) { destroy_face(fa[i]); }
 		destroy_vertex(vr);
 		for_int(i, fa.size()) { fa[i] = create_face(va[i]); }
-		remove_bogus_hedges(ar_he);
+		remove_bogus_hedges(&ar_he);
 		return edge(va[0][0], va[0][va[0].size() - 1]);
 	}
 
@@ -1191,11 +1135,12 @@ namespace HuguesHoppe
 		v1->_arhe.erase(it); // slow, shucks
 	}
 
-	void Mesh::create_bogus_hedges(std::vector<HEdge> ar_he)
+	void Mesh::create_bogus_hedges(std::vector<HEdge> *ar_he)
 	{
-		for_int(i, ar_he.size())
+		std::vector<HEdge> temp(ar_he->size());
+		for_int(i, ar_he->size())
 		{
-			HEdge& he = ar_he[i];
+			HEdge he = (*ar_he)[i];
 			if (is_boundary(he))
 			{
 				HEdge heo = he;
@@ -1205,19 +1150,27 @@ namespace HuguesHoppe
 				he->vert = heo->prev->vert;
 				he->prev = nullptr; // note: temporarily causes mesh.ok() to fail
 				he->next = nullptr;
-				he->face = reinterpret_cast<Face>(v1); // temporary overload
+				he->face = (Face)(v1); // temporary overload
 				enter_hedge(he, v1);
 			}
 			else
 			{
 				he = nullptr;
 			}
+
+			temp[i] = he;
+		}
+		
+		ar_he->clear();
+		for (HEdge he : temp)
+		{
+			ar_he->push_back(he);
 		}
 	}
 
-	void Mesh::remove_bogus_hedges(std::vector<HEdge> ar_he)
+	void Mesh::remove_bogus_hedges(std::vector<HEdge>* ar_he)
 	{
-		for (HEdge he : ar_he)
+		for (HEdge he : *ar_he)
 		{
 			if (!he) continue;
 			Vertex v1 = reinterpret_cast<Vertex>(he->face); // temporary overload
