@@ -48,7 +48,7 @@ PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 using namespace HuguesHoppe;
 
 // constants for models:  file names, vertex count, model display size
-const int nModels = 3;  // number of models in this scene
+const int nModels = 4;  // number of models in this scene
 char * modelFile[nModels] = { "src/knot.pcd" };
 const int nVertices[nModels] = { 1280 };
 char * vertexShaderFile = "src/simpleVertex.glsl";
@@ -63,7 +63,7 @@ GLuint vao;
 
 // Point cloud information
 PointCloud* pointCloud;  // The loaded point cloud
-int numVertices; // number of vertices/points
+int numVertices, numContourVertices; // number of vertices/points
 std::vector<glm::vec3> points; // The point cloud points
 std::vector<glm::vec3> pcTPOrig; // Origins of Tangent Planes
 std::vector<glm::mat4x3> pcTP; // Tangent planes
@@ -76,7 +76,7 @@ std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
 int minkintp = 4, maxkintp = 20, gridsize = 20; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
-bool showUnorientTP = false, showOrientTP = false, cullFace = true;
+bool showUnorientTP = false, showOrientTP = false, showContour = false, cullFace = true;
 
 // model, view, projection matrices and values to create modelMatrix.
 glm::mat4 modelMatrix;          // set in display()
@@ -84,7 +84,6 @@ glm::mat4 modelViewMatrix;
 glm::mat4 projectionMatrix;     // set in reshape()
 glm::mat4 ModelViewProjectionMatrix; // set in display();
 
-									 // flags
 bool showAxesFlag = false;
 
 // Constants for scene
@@ -157,8 +156,6 @@ void display()
 	glDepthMask(GL_TRUE);
 	glUseProgram(shaderProgram);
 
-
-
 	// update model matrix
 	for (int id : *scene->DrawableObjects())
 	{
@@ -183,6 +180,12 @@ void display()
 		{
 			glBindVertexArray(VAO[2]);
 			glDrawArrays(GL_TRIANGLES, 0, 6 * numVertices);
+		}
+
+		if (showContour)
+		{
+			glBindVertexArray(VAO[3]);
+			glDrawArrays(GL_TRIANGLES, 0, numContourVertices);
 		}
 	}
 
@@ -431,21 +434,7 @@ struct eval_point
 
 template<typename Contour> void contour_3D(Contour& contour)
 {
-	/*contour.set_ostream(&std::cout);
-	if (unsigneddis)
-	{
-		Point p = co[0];
-		for_intL(i, 1, num) { if (co[i][2]>p[2]) p = co[i]; }
-		for_int(i, 20)
-		{
-			p[2] += float(i) / gridsize;
-			if (contour.march_from(p)>1) break;
-		}
-	*/
-	//else 
-	//{
-		for_int(i, numVertices) { contour.march_from(pcTPOrig[i]); }
-	//}
+	for_int(i, numVertices) { contour.march_from(pcTPOrig[i]); }
 }
 
 // Creates the tangent planes for rendering
@@ -454,9 +443,9 @@ void makeTangentPlanes(GLuint vao, GLuint vbo)
 	// Set array sizes
 	int vec3Size = 6 * numVertices * sizeof(glm::vec3);
 	int vec4Size = 6 * numVertices * sizeof(glm::vec4);
-	glm::vec4* vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
-	glm::vec4* color = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));;
-	glm::vec3* normal = (glm::vec3 *) calloc(vec3Size, sizeof(glm::vec3));;
+	glm::vec4* vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));
+	glm::vec4* color = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));
+	glm::vec3* normal = (glm::vec3 *) calloc(vec3Size, sizeof(glm::vec3));
 
 	for_int(i, numVertices)
 	{
@@ -494,6 +483,56 @@ void makeTangentPlanes(GLuint vao, GLuint vbo)
 			color[i * 6 + j] = glm::vec4(1, 1, 1, 1); // Using depth coloring
 			normal[i * 6 + j] = glm::vec3();// pcTPNorm[i]; // If using lighting
 		}
+	}
+
+	// Set vertex data
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, 2 * vec4Size + vec3Size, NULL, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, vec4Size, vertex);
+	glBufferSubData(GL_ARRAY_BUFFER, vec4Size, vec4Size, color);
+	glBufferSubData(GL_ARRAY_BUFFER, 2 * vec4Size, vec3Size, normal);
+	// set vertex shader variable handles
+	GLuint vPosition = glGetAttribLocation(shaderProgram, "vPosition");
+	glEnableVertexAttribArray(vPosition);
+	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
+	GLuint vColor = glGetAttribLocation(shaderProgram, "vColor");
+	glEnableVertexAttribArray(vColor);
+	glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vec4Size));
+	GLuint vNormal = glGetAttribLocation(shaderProgram, "vNormal");
+	glEnableVertexAttribArray(vNormal);
+	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(2 * vec4Size));
+
+	free(vertex);
+	free(color);
+	free(normal);
+}
+
+void makeContour(GLuint vao, GLuint vbo)
+{
+	std::vector<Face> faces = mesh.facesVector();
+	numContourVertices = faces.size() * 3;
+	int vec3Size = numContourVertices * sizeof(glm::vec3);
+	int vec4Size = numContourVertices * sizeof(glm::vec4);
+	glm::vec4* vertex = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));
+	glm::vec4* color = (glm::vec4 *) calloc(vec4Size, sizeof(glm::vec4));
+	glm::vec3* normal = (glm::vec3 *) calloc(vec3Size, sizeof(glm::vec3));
+
+	int index = 0;
+
+	for (Face face : faces)
+	{
+		HEdge he = face->herep;
+		HEdge start = he;
+		do
+		{
+			Vertex v = he->vert;
+			vertex[index] = glm::vec4(v->point, 1.0f);
+			color[index] = glm::vec4(1, 1, 1, 1); // Using depth coloring
+			normal[index] = glm::vec3();
+			he = he->next;
+			index++;
+		} while (he != start);
 	}
 
 	// Set vertex data
@@ -621,6 +660,9 @@ void init()
 	end = glutGet(GLUT_ELAPSED_TIME);
 	printf("Contour: %3f\n", ((end - time) / 1000));
 
+	// Create oriented tangent planes
+	makeContour(VAO[3], buffer[3]);
+
 	// Initialize display info
 	lastTime = glutGet(GLUT_ELAPSED_TIME);
 	ulastTime = lastTime;
@@ -672,6 +714,11 @@ void keyboard(unsigned char key, int x, int y)
 		showUnorientTP = false;
 		showOrientTP = !showOrientTP;
 		break;
+
+	case '4': // Toggle mesh contour
+		showUnorientTP = false;
+		showOrientTP = false;
+		showContour = !showContour;
 
 	case 'c':
 	case 'C': // Toggle culling

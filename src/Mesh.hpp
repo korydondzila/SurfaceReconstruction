@@ -171,11 +171,8 @@ namespace HuguesHoppe
 		int num_vertices() const { return _id2vertex.size(); }
 		int num_faces() const { return _id2face.size(); }
 		int num_edges() const { return _nedges; }
-		// Random access (fast), assert there exist at least one
-		Vertex random_vertex(Random& r) const;
-		Face random_face(Random& r) const;
-		Edge random_edge(Random& r) const; // unbiased for a closed triangle mesh
-										   // Flags
+
+		// Flags
 		static FlagMask allocate_flag() { static int s_counter; return Flags::allocate(s_counter); }
 		static FlagMask allocate_Vertex_flag() { static int s_counter; return Flags::allocate(s_counter); }
 		static FlagMask allocate_Face_flag() { static int s_counter; return Flags::allocate(s_counter); }
@@ -244,6 +241,11 @@ namespace HuguesHoppe
 									// These mesh iterators do not define an order.
 		Vertices_range vertices() const { return cvalues_range<Vertex>(_id2vertex); }
 		Faces_range faces() const { return cvalues_range<Face>(_id2face); }
+		std::vector<Face> facesVector() const {
+			std::vector<Face> faces(_id2face.size());
+			get_values<int, Face>(_id2face, faces);
+			return faces;
+		}
 		Edges_range edges() const { return Edges_range(*this); }
 		// These mesh iterators sort by id numbers.
 		OrderedVertices_range ordered_vertices() const { return OrderedVertices_range(*this); }
@@ -578,7 +580,6 @@ namespace HuguesHoppe
 			Flags _flags;
 			std::unique_ptr<char[]> _string;
 			MEdge(HEdge pherep) : herep(pherep) { }
-			//HH_MAKE_POOLED_SAC(Mesh::MEdge); // must be last entry of class!
 		};
 		struct MVertex
 		{
@@ -588,7 +589,6 @@ namespace HuguesHoppe
 			std::unique_ptr<char[]> _string;
 			glm::vec3 point;
 			MVertex(int pid) : id(pid) { }
-			//HH_MAKE_POOLED_SAC(Mesh::MVertex); // must be last entry of class!
 		};
 		struct MFace
 		{
@@ -597,7 +597,6 @@ namespace HuguesHoppe
 			Flags _flags;
 			std::unique_ptr<char[]> _string;
 			MFace(int pid) : id(pid) { }
-			//HH_MAKE_POOLED_SAC(MFace);  // must be last entry of class!
 		};
 		struct MHEdge
 		{
@@ -609,7 +608,6 @@ namespace HuguesHoppe
 			Edge edge;              // Edge to which this HEdge belongs
 			std::unique_ptr<char[]> _string;
 			MHEdge() = default;
-			//HH_MAKE_POOLED_SAC(MHEdge); // must be last entry of class!
 		};
 	public:                                                       // Discouraged:
 		virtual Vertex create_vertex_private(int id);              // die if id is already used
@@ -662,14 +660,7 @@ namespace HuguesHoppe
 	using Face = Mesh::Face;
 	using Corner = Mesh::Corner;
 	using Edge = Mesh::Edge;
-
-
-	//----------------------------------------------------------------------------
-
-	//HH_INITIALIZE_POOL_NESTED(Mesh::MVertex, MeshMVertex);
-	//HH_INITIALIZE_POOL_NESTED(Mesh::MFace, MeshFace);
-	//HH_INITIALIZE_POOL_NESTED(Mesh::MEdge, MeshMEdge);
-	//HH_INITIALIZE_POOL_NESTED(Mesh::MHEdge, MeshMHEdge);
+	using HEdge = Mesh::HEdge;
 
 	inline void swap(Mesh& l, Mesh& r) noexcept
 	{
