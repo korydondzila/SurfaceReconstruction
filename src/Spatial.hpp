@@ -43,8 +43,8 @@ namespace HuguesHoppe
 	{
 		static constexpr int k_max_gn = 1023; // 10 bits per coordinate
 	public:
-		explicit Spatial(int gn, const glm::vec3& min, const glm::vec3& max) : 
-			_gn(gn), _boxBounds(Vec2<glm::vec3>(min, max)) { assert(_gn <= k_max_gn); _gni = 1.f / float(_gn); }
+		explicit Spatial(int gn, const Vec2<glm::vec3>& boxBound) : 
+			_gn(gn), _boxBounds(boxBound) { assert(_gn <= k_max_gn); _gni = 1.f / float(_gn); }
 		virtual ~Spatial() { } // not =default because gcc "looser throw specified" in derived
 		virtual void clear() = 0;
 	protected:
@@ -74,7 +74,7 @@ namespace HuguesHoppe
 	class BPointSpatial : public Spatial
 	{
 	public:
-		explicit BPointSpatial(int gn, const glm::vec3& min, const glm::vec3& max ) : Spatial(gn, min, max) { }
+		explicit BPointSpatial(int gn, const Vec2<glm::vec3>& boxBound) : Spatial(gn, boxBound) { }
 		~BPointSpatial() { clear(); }
 		void clear() override;
 		void enter(int id, const glm::vec3* pp);  // note: pp not copied, no ownership taken
@@ -143,7 +143,7 @@ namespace HuguesHoppe
 	class PointSpatial : public BPointSpatial
 	{
 	public:
-		explicit PointSpatial(int gn, const glm::vec3& min, const glm::vec3& max) : BPointSpatial(gn, min, max) { }
+		explicit PointSpatial(int gn, const Vec2<glm::vec3>& boxBound) : BPointSpatial(gn, boxBound) { }
 		void enter(int id, const glm::vec3* pp) { BPointSpatial::enter(id, pp); }
 		void remove(int id, const glm::vec3* pp) { BPointSpatial::remove(id, pp); }
 	};

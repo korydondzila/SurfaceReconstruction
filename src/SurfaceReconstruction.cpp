@@ -63,6 +63,7 @@ GLuint vao;
 
 // Point cloud information
 PointCloud* pointCloud;  // The loaded point cloud
+Vec2<glm::vec3> pcBoxBound;
 int numVertices, numContourVertices; // number of vertices/points
 std::vector<glm::vec3> points; // The point cloud points
 std::vector<glm::vec3> pcTPOrig; // Origins of Tangent Planes
@@ -390,41 +391,41 @@ void orient_tp()
 // Now: check to see if the sample point is farther than samplingd+cube_size from any data point.
 float compute_signed(const glm::vec3& p, glm::vec3& proj)
 {
-	int tpi;
-	{
-		SpatialSearch ss(*SPpc, p);
-		tpi = ss.next();
-	}
+	SpatialSearch ss1(*SPpc, p);
+	int tpi = ss1.next();
 	glm::vec3 vptopc = p - pcTPOrig[tpi];
 	float dis = glm::dot(vptopc, pcTPNorm[tpi]);
 	proj = p - dis * pcTPNorm[tpi];
-	if (proj[0] <= 0 || proj[0] >= 1 || proj[1] <= 0 || proj[1] >= 1 || proj[2] <= 0 || proj[2] >= 1)
-		return k_Contour_undefined;
-	if (1)
+
+	// Check that projected point is in point cloud space
+	for_int(i, 3)
 	{
-		// check that projected point is close to a data point
-		SpatialSearch ss(*SPp, proj);
-		float dis2; ss.next(&dis2);
-		if (dis2>square(samplingd)) return k_Contour_undefined;
+		if (proj[i] <= pcBoxBound[0][i] || proj[i] >= pcBoxBound[1][i])
+			return k_Contour_undefined;
 	}
-	{
-		// check that grid point is close to a data point
-		SpatialSearch ss(*SPp, p);
-		float dis2; ss.next(&dis2);
-		float grid_diagonal2 = square(1.f / gridsize)*3.f;
-		const float fudge = 1.2f;
-		if (dis2>grid_diagonal2*square(fudge)) return k_Contour_undefined;
-	}
+
+	// check that projected point is close to a data point
+	SpatialSearch ss2(*SPp, proj);
+	float dis2; ss2.next(&dis2);
+	if (dis2>square(samplingd)) return k_Contour_undefined;
+
+	// check that grid point is close to a data point
+	SpatialSearch ss3(*SPp, p);
+	float dis3; ss3.next(&dis3);
+	float grid_diagonal2 = square(1.f / gridsize)*3.f;
+	const float fudge = 1.2f;
+
+	// This may be required
+	//if (dis3>grid_diagonal2*square(fudge)) return k_Contour_undefined;
+
 	return dis;
 }
-
-glm::vec3 build_Point(const glm::vec3& p) { return p; }
 
 struct eval_point
 {
 	float operator()(const glm::vec3& pp) const
 	{
-		glm::vec3 p = build_Point(pp);
+		glm::vec3 p = pp;
 		glm::vec3 proj;
 		float dis = compute_signed(p, proj);
 		if (dis == k_Contour_undefined) return dis;
@@ -622,12 +623,13 @@ void init()
 	pcTPNorm = std::vector<glm::vec3>(numVertices);
 	pcTPOrient = std::vector<bool>(numVertices, false);
 	pcTP = std::vector<glm::mat4x3>(numVertices);
-	showVec3("Min", pointCloud->MinBound());
-	showVec3("Max", pointCloud->MaxBound());
+	pcBoxBound = Vec2<glm::vec3>(pointCloud->MinBound(), pointCloud->MaxBound());
+	showVec3("Min", pcBoxBound[0]);
+	showVec3("Max", pcBoxBound[1]);
 
 	// Create spatial partition
 	int n = numVertices > 100000 ? 60 : numVertices > 5000 ? 36 : 20;
-	SPp = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
+	SPp = std::make_unique<PointSpatial>(n, pcBoxBound);
 	points = *(pointCloud->Points());
 	for_int(i, numVertices) { SPp->enter(i, &points[i]); } // Adds all points to spatial partition
 
@@ -642,7 +644,7 @@ void init()
 	// Create unoriented tangent planes
 	makeTangentPlanes(VAO[1], buffer[1]);
 
-	SPpc = std::make_unique<PointSpatial>(n, pointCloud->MinBound(), pointCloud->MaxBound());
+	SPpc = std::make_unique<PointSpatial>(n, pcBoxBound);
 	for_int(i, numVertices) { SPpc->enter(i, &pcTPOrig[i]); } // Add tp origins to spatial partition
 
 	time = glutGet(GLUT_ELAPSED_TIME);
@@ -655,7 +657,7 @@ void init()
 	makeTangentPlanes(VAO[2], buffer[2]);
 
 	time = glutGet(GLUT_ELAPSED_TIME);
-	Contour3DMesh<eval_point> contour(gridsize, pointCloud->MinBound(), pointCloud->MaxBound(), &mesh);
+	Contour3DMesh<eval_point> contour(gridsize, pcBoxBound, &mesh);
 	contour_3D(contour);
 	end = glutGet(GLUT_ELAPSED_TIME);
 	printf("Contour: %3f\n", ((end - time) / 1000));
@@ -703,15 +705,18 @@ void keyboard(unsigned char key, int x, int y)
 	case '1': // Point cloud only
 		showUnorientTP = false;
 		showOrientTP = false;
+		showContour = false;
 		break;
 
 	case '2': // Toggle unoriented TPs
-		showUnorientTP = !showUnorientTP;
 		showOrientTP = false;
+		showContour = false;
+		showUnorientTP = !showUnorientTP;
 		break;
 
 	case '3': // Toggle oriented TPs
 		showUnorientTP = false;
+		showContour = false;
 		showOrientTP = !showOrientTP;
 		break;
 
@@ -719,6 +724,7 @@ void keyboard(unsigned char key, int x, int y)
 		showUnorientTP = false;
 		showOrientTP = false;
 		showContour = !showContour;
+		break;
 
 	case 'c':
 	case 'C': // Toggle culling

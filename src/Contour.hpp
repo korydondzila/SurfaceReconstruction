@@ -30,8 +30,8 @@ namespace HuguesHoppe
 		using DPoint = glm::vec3; // domain point
 		using IPoint = glm::ivec3;   // grid point
 		static constexpr int k_max_gn = 1024; // bits/coordinate==10 for 3D, 16
-		ContourBase(int gn, const glm::vec3& min, const glm::vec3& max) : 
-			_gn(gn), _gni(1.f / gn), _boxBounds(Vec2<glm::vec3>(min, max))
+		ContourBase(int gn, const Vec2<glm::vec3>& boxBound) : 
+			_gn(gn), _gni(1.f / gn), _boxBounds(boxBound)
 		{
 			assert(_gn > 0);
 			assert(_gn < k_max_gn);  // must leave room for [0.._gn] inclusive
@@ -103,7 +103,12 @@ namespace HuguesHoppe
 		{
 			// Note: less strict than cube_inbounds() because ci[c]==_gn is OK for a vertex.
 			// DPoint dp; for_int(c, D) { assert(ci[c]>=0 && ci[c]<=_gn); dp[c] = min(ci[c]*_gni, 1.f); }
-			DPoint dp; for_int(c, 3) { assert(ci[c] >= 0 && ci[c] <= _gn); dp[c] = ci[c] < _gn ? ci[c] * _gni : 1.f; }
+			glm::vec3 min = _boxBounds[0], max = _boxBounds[1];
+			DPoint dp; for_int(c, 3) {
+				assert(ci[c] >= 0 && ci[c] <= _gn);
+				float dist = max[c] - min[c];
+				dp[c] = ci[c] < _gn ? ci[c] * _gni * dist - dist / 2 : max[c];
+			}
 			return dp;
 		}
 
@@ -190,8 +195,8 @@ namespace HuguesHoppe
 			Derived& derived() { return *static_cast<Derived*>(this); }
 			const Derived& derived() const { return *static_cast<const Derived*>(this); }
 		public:
-			Contour3DBase(int gn, const glm::vec3& min, const glm::vec3& max, Eval eval) : 
-				base(gn, min, max), _eval(eval) { }
+			Contour3DBase(int gn, const Vec2<glm::vec3>& boxBound, Eval eval) : 
+				base(gn, boxBound), _eval(eval) { }
 			~Contour3DBase() { }
 			// ret number of new cubes visited: 0=revisit_cube, 1=no_surf, >1=new
 			int march_from(const DPoint& startp) { return march_from_i(startp); }
@@ -359,8 +364,8 @@ namespace HuguesHoppe
 	{
 		using base = Contour3DBase<VertexData3DMesh, Contour3DMesh<Eval>, Eval>;
 		public:
-			Contour3DMesh(int gn, const glm::vec3& min, const glm::vec3& max, Mesh* pmesh, Eval eval = Eval())
-				: base(gn, min, max, eval), _pmesh(pmesh)
+			Contour3DMesh(int gn, const Vec2<glm::vec3>& boxBound, Mesh* pmesh, Eval eval = Eval())
+				: base(gn, boxBound, eval), _pmesh(pmesh)
 			{
 				assert(_pmesh);
 			}
@@ -437,10 +442,10 @@ namespace HuguesHoppe
 						mapsucc.emplace(v2, v1);  // to get face order correct
 					}
 				}
-				std::vector<Vertex> va(12);
 
 				while (!mapsucc.empty())
 				{
+					std::vector<Vertex> va(12);
 					Vertex vf = nullptr; int minvi = INT_MAX; // find min to be portable // BREAKPOINT
 					std::vector<Vertex> keys(mapsucc.size());
 					get_keys(mapsucc, keys);
