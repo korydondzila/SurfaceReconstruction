@@ -107,7 +107,7 @@ namespace HuguesHoppe
 			DPoint dp; for_int(c, 3) {
 				assert(ci[c] >= 0 && ci[c] <= _gn);
 				float dist = max[c] - min[c];
-				dp[c] = ci[c] < _gn ? ci[c] * _gni * dist - dist / 2 : max[c];
+				dp[c] = ci[c] < _gn ? ci[c] * _gni * dist + min[c] : max[c];
 			}
 			return dp;
 		}
@@ -222,8 +222,8 @@ namespace HuguesHoppe
 			int float_to_index(int axis, float fd) const
 			{
 				float f = fd, min = _boxBounds[0][axis], max = _boxBounds[1][axis];
-				if (f <= min + 0.01f) { assert(f >= min - 0.01f); f = min + 0.01f; }
-				if (f >= max - 0.01f) { assert(f <= max + 0.01f); f = max - 0.01f; }
+				if (f <= min + 0.1f) { assert(f >= min - 0.1f); f = min + 0.1f; }
+				if (f >= max - 0.1f) { assert(f <= max + 0.1f); f = max - 0.1f; }
 
 				f = (f - min) / (max - min);
 
@@ -306,7 +306,8 @@ namespace HuguesHoppe
 						n->_val = _eval(n->_p);
 						_nvevaled++;
 						if (!n->_val) _nvzero++;
-						if (n->_val == k_Contour_undefined) _nvundef++;
+						if (n->_val == k_Contour_undefined)
+							_nvundef++;
 					}
 
 					if (n->_val == k_Contour_undefined) cundef = true;

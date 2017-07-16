@@ -629,6 +629,7 @@ namespace HuguesHoppe
 	{
 		if (sdebug >= 1) valid(f);
 		std::vector<Vertex> va; get_vertices(f, va);
+		int numVerts = va.size();
 		// Create bogus hedges if boundaries
 		std::vector<HEdge> ar_he; for (HEdge he : corners(f)) { ar_he.push_back(he); }
 		create_bogus_hedges(&ar_he);
@@ -636,9 +637,18 @@ namespace HuguesHoppe
 		destroy_face(f);
 		// Create new vertex and faces
 		Vertex vn = create_vertex();
-		for_int(i, va.size())
+
+		glm::vec3 average = glm::vec3();
+		for (Vertex vert : va)
 		{
-			create_face(va[i], va[(i + 1) % va.size()], vn);
+			average += vert->point;
+		}
+
+		vn->point = glm::vec3(average.x / numVerts, average.y / numVerts, average.z / numVerts);
+
+		for_int(i, numVerts)
+		{
+			create_face(va[i], va[(i + 1) % numVerts], vn);
 		}
 		remove_bogus_hedges(&ar_he);
 		return vn;

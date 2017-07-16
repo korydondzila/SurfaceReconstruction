@@ -75,7 +75,7 @@ std::unique_ptr<PointSpatial> SPpc; // pcTPOrig spatial partition
 std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
-int minkintp = 4, maxkintp = 20, gridsize = 20; // Min/Max number of points in tangent plane
+int minkintp = 4, maxkintp = 20, gridsize = 10; // Min/Max number of points in tangent plane
 float samplingd = 0.0f; // Sampling density
 bool showUnorientTP = false, showOrientTP = false, showContour = false, cullFace = true;
 
@@ -395,24 +395,31 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	int tpi = ss1.next();
 	glm::vec3 vptopc = p - pcTPOrig[tpi];
 	float dis = glm::dot(vptopc, pcTPNorm[tpi]);
+	if (dis >= -0.01f && dis <= 0.01f)
+		dis = 0;
 	proj = p - dis * pcTPNorm[tpi];
 
 	// Check that projected point is in point cloud space
 	for_int(i, 3)
 	{
-		if (proj[i] <= pcBoxBound[0][i] || proj[i] >= pcBoxBound[1][i])
+		if (proj[i] < pcBoxBound[0][i] || proj[i] > pcBoxBound[1][i])
 			return k_Contour_undefined;
 	}
 
 	// check that projected point is close to a data point
 	SpatialSearch ss2(*SPp, proj);
 	float dis2; ss2.next(&dis2);
-	if (dis2>square(samplingd)) return k_Contour_undefined;
+	if (dis2>square(samplingd))
+		return k_Contour_undefined;
 
 	// check that grid point is close to a data point
 	SpatialSearch ss3(*SPp, p);
 	float dis3; ss3.next(&dis3);
+	float xDis = pcBoxBound[1][0] - pcBoxBound[0][0];
+	float yDis = pcBoxBound[1][1] - pcBoxBound[0][1];
+	float zDis = pcBoxBound[1][2] - pcBoxBound[0][2];
 	float grid_diagonal2 = square(1.f / gridsize)*3.f;
+	//float grid_diagonal2 = square(xDis / gridsize) + square(yDis / gridsize) + square(zDis / gridsize);
 	const float fudge = 1.2f;
 
 	// This may be required
@@ -435,7 +442,9 @@ struct eval_point
 
 template<typename Contour> void contour_3D(Contour& contour)
 {
-	for_int(i, numVertices) { contour.march_from(pcTPOrig[i]); }
+	for_int(i, numVertices) {
+		contour.march_from(pcTPOrig[i]);
+	}
 }
 
 // Creates the tangent planes for rendering
@@ -587,6 +596,46 @@ void init()
 			glm::vec3 point = sphereToCartesian(rho, theta, phi);
 			points.push_back(point);
 			writePointCloud("src/sphere.pcd", numPoints, points);
+		}
+	}
+
+	if (false)
+	{
+		std::vector<glm::vec3> points = std::vector<glm::vec3>();
+		srand((unsigned int)time(NULL));
+		int numPoints = 60;
+
+		for_int(i, 6)
+		{
+			for_int(j, 10)
+			{
+				float pos1 = ((float)rand() / RAND_MAX);
+				float pos2 = ((float)rand() / RAND_MAX);
+				glm::vec3 point = glm::vec3();
+				switch (i)
+				{
+				case 0:
+					point = glm::vec3(pos1, pos2, -1);
+					break;
+				case 1:
+					point = glm::vec3(pos1, pos2, 1);
+					break;
+				case 2:
+					point = glm::vec3(pos1, -1, pos2);
+					break;
+				case 3:
+					point = glm::vec3(pos1, 1, pos2);
+					break;
+				case 4:
+					point = glm::vec3(-1, pos1, pos2);
+					break;
+				case 5:
+					point = glm::vec3(1, pos1, pos2);
+					break;
+				}
+				points.push_back(point);
+				writePointCloud("src/sphere.pcd", numPoints, points);
+			}
 		}
 	}
 
