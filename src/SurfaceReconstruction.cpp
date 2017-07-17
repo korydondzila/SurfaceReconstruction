@@ -395,8 +395,8 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	int tpi = ss1.next();
 	glm::vec3 vptopc = p - pcTPOrig[tpi];
 	float dis = glm::dot(vptopc, pcTPNorm[tpi]);
-	if (dis >= -0.01f && dis <= 0.01f)
-		dis = 0;
+	//if (dis >= -0.01f && dis <= 0.01f)
+	//	dis = 0;
 	proj = p - dis * pcTPNorm[tpi];
 
 	// Check that projected point is in point cloud space
@@ -405,7 +405,7 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 		if (proj[i] < pcBoxBound[0][i] || proj[i] > pcBoxBound[1][i])
 			return k_Contour_undefined;
 	}
-
+	
 	// check that projected point is close to a data point
 	SpatialSearch ss2(*SPp, proj);
 	float dis2; ss2.next(&dis2);
@@ -418,13 +418,13 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	float xDis = pcBoxBound[1][0] - pcBoxBound[0][0];
 	float yDis = pcBoxBound[1][1] - pcBoxBound[0][1];
 	float zDis = pcBoxBound[1][2] - pcBoxBound[0][2];
-	float grid_diagonal2 = square(1.f / gridsize)*3.f;
-	//float grid_diagonal2 = square(xDis / gridsize) + square(yDis / gridsize) + square(zDis / gridsize);
+	float grid_diagonal2 = square(xDis / gridsize) + square(yDis / gridsize) + square(zDis / gridsize);
 	const float fudge = 1.2f;
 
 	// This may be required
-	//if (dis3>grid_diagonal2*square(fudge)) return k_Contour_undefined;
-
+	if (dis3>grid_diagonal2*square(fudge))
+		return k_Contour_undefined;
+	
 	return dis;
 }
 
