@@ -3,10 +3,7 @@
 #define CONTOUR_H
 
 #include "includes\includes.hpp"
-//#include "Flags.hpp"
-//using namespace HuguesHoppe;
 #include "Mesh.hpp"
-//#include "MeshOp.h"             // triangulate_face()
 
 namespace HuguesHoppe
 {

@@ -75,9 +75,6 @@
     <ClInclude Include="src\Contour.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Flags.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

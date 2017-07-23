@@ -395,8 +395,6 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	int tpi = ss1.next();
 	glm::vec3 vptopc = p - pcTPOrig[tpi];
 	float dis = glm::dot(vptopc, pcTPNorm[tpi]);
-	//if (dis >= -0.01f && dis <= 0.01f)
-	//	dis = 0;
 	proj = p - dis * pcTPNorm[tpi];
 
 	// Check that projected point is in point cloud space
@@ -422,8 +420,8 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	const float fudge = 1.2f;
 
 	// This may be required
-	if (dis3>grid_diagonal2*square(fudge))
-		return k_Contour_undefined;
+	//if (dis3>grid_diagonal2*square(fudge))
+	//	return k_Contour_undefined;
 	
 	return dis;
 }
