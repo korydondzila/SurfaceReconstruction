@@ -76,7 +76,7 @@ std::unique_ptr<Graph<int>> gpcpseudo; // Riemannian on pc centers (based on co)
 std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
 int minkintp = 4, maxkintp = 20, gridsize = 10; // Min/Max number of points in tangent plane
-float samplingd = 0.0f; // Sampling density
+float samplingDensity = 0.0f; // Sampling density
 bool showUnorientTP = false, showOrientTP = false, showContour = false, cullFace = true;
 
 // model, view, projection matrices and values to create modelMatrix.
@@ -232,18 +232,18 @@ void update(int value)
 // Compute the tangent plane
 void compute_tp(int i, int& n, glm::mat4x3& f)
 {
-	std::vector<glm::vec3> pa;
+	std::vector<glm::vec3> pointArray;
 	SpatialSearch ss(*SPp, points[i]);
 	for (;;) {
 		assert(!ss.done());
-		float dis2; int pi = ss.next(&dis2);
-		if ((int(pa.size()) >= minkintp && dis2 > square(samplingd)) || int(pa.size()) >= maxkintp) break;
-		pa.push_back(points[pi]);
-		if (pi != i && !gpcpseudo->contains(i, pi)) gpcpseudo->enter_undirected(i, pi);
+		float distanceSquared; int pointId = ss.next(&distanceSquared);
+		if ((int(pointArray.size()) >= minkintp && distanceSquared > square(samplingDensity)) || int(pointArray.size()) >= maxkintp) break;
+		pointArray.push_back(points[pointId]);
+		if (pointId != i && !gpcpseudo->contains(i, pointId)) gpcpseudo->enter_undirected(i, pointId);
 	}
 	glm::vec3 eimag;
-	principal_components(pa, f, eimag);
-	n = pa.size();
+	principal_components(pointArray, f, eimag);
+	n = pointArray.size();
 }
 
 // Compute tangent planes for all points
@@ -387,8 +387,8 @@ void orient_tp()
 }
 
 // Find the closest tangent plane origin and compute the signed distance to that tangent plane.
-// Was: check to see if the projection onto the tangent plane lies farther than samplingd from any data point.
-// Now: check to see if the sample point is farther than samplingd+cube_size from any data point.
+// Was: check to see if the projection onto the tangent plane lies farther than samplingDensity from any data point.
+// Now: check to see if the sample point is farther than samplingDensity+cube_size from any data point.
 float compute_signed(const glm::vec3& p, glm::vec3& proj)
 {
 	SpatialSearch ss1(*SPpc, p);
@@ -407,7 +407,7 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	// check that projected point is close to a data point
 	SpatialSearch ss2(*SPp, proj);
 	float dis2; ss2.next(&dis2);
-	if (dis2>square(samplingd))
+	if (dis2>square(samplingDensity))
 		return k_Contour_undefined;
 
 	// check that grid point is close to a data point
@@ -597,46 +597,6 @@ void init()
 		}
 	}
 
-	if (false)
-	{
-		std::vector<glm::vec3> points = std::vector<glm::vec3>();
-		srand((unsigned int)time(NULL));
-		int numPoints = 60;
-
-		for_int(i, 6)
-		{
-			for_int(j, 10)
-			{
-				float pos1 = ((float)rand() / RAND_MAX);
-				float pos2 = ((float)rand() / RAND_MAX);
-				glm::vec3 point = glm::vec3();
-				switch (i)
-				{
-				case 0:
-					point = glm::vec3(pos1, pos2, -1);
-					break;
-				case 1:
-					point = glm::vec3(pos1, pos2, 1);
-					break;
-				case 2:
-					point = glm::vec3(pos1, -1, pos2);
-					break;
-				case 3:
-					point = glm::vec3(pos1, 1, pos2);
-					break;
-				case 4:
-					point = glm::vec3(-1, pos1, pos2);
-					break;
-				case 5:
-					point = glm::vec3(1, pos1, pos2);
-					break;
-				}
-				points.push_back(point);
-				writePointCloud("src/sphere.pcd", numPoints, points);
-			}
-		}
-	}
-
 	// load the shader programs
 	shaderProgram = loadShaders(vertexShaderFile, fragmentShaderFile);
 	glUseProgram(shaderProgram);
@@ -654,13 +614,13 @@ void init()
 	StaticEntity* pc = new StaticEntity(scene->GetModel("sphere"));
 
 	numVertices = pointCloud->Vertices();
-	samplingd = INFINITY;
-	//samplingd = numVertices / pointCloud->BoundingRadius();
-	//samplingd = numVertices / (pow(pointCloud->BoundingRadius(), 2));
-	//samplingd = 2.f;
-	//samplingd = numVertices / (pow(pointCloud->BoundingRadius(), 3));
-	//samplingd = numVertices / ((4.f / 3.f) * PI * pow(pointCloud->BoundingRadius(), 3));
-	printf("Sampling Density %3f\n", samplingd);
+	samplingDensity = INFINITY;
+	//samplingDensity = numVertices / pointCloud->BoundingRadius();
+	//samplingDensity = numVertices / (pow(pointCloud->BoundingRadius(), 2));
+	//samplingDensity = 2.f;
+	//samplingDensity = numVertices / (pow(pointCloud->BoundingRadius(), 3));
+	//samplingDensity = numVertices / ((4.f / 3.f) * PI * pow(pointCloud->BoundingRadius(), 3));
+	printf("Sampling Density %3f\n", samplingDensity);
 
 	sprintf(pointClousdStr, "  Point Cloud %s", pointCloud->File());
 	sprintf(verticesStr, "  Vertices %i", numVertices);
