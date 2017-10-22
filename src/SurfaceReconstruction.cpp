@@ -400,7 +400,9 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	// Check that projected point is in point cloud space
 	for_int(i, 3)
 	{
-		if (proj[i] < pcBoxBound[0][i] || proj[i] > pcBoxBound[1][i])
+		float min = pcBoxBound[0][i], max = pcBoxBound[1][i];
+		float dis = 0.1f;
+		if (proj[i] < pcBoxBound[0][i] - dis || proj[i] > pcBoxBound[1][i] + dis)
 			return k_Contour_undefined;
 	}
 	
@@ -462,7 +464,7 @@ void makeTangentPlanes(GLuint vao, GLuint vbo)
 		float x = pcTPNorm[i].x, y = pcTPNorm[i].y, z = pcTPNorm[i].z;
 
 		// Make sure up is in correct direction (not colinear)
-		if (abs(y) > abs(x) && abs(y) > abs(z))
+		if (std::abs(y) > std::abs(x) && std::abs(y) > std::abs(z))
 		{
 			up = glm::vec3(0, 0, 1);
 		}
@@ -566,16 +568,6 @@ void makeContour(GLuint vao, GLuint vbo)
 	free(normal);
 }
 
-// Convert sphere coordinates to cartesian coordinates
-glm::vec3 sphereToCartesian(float rho, float theta, float phi)
-{
-	glm::vec3 point = glm::vec3();
-	point.x = rho * sin(phi) * cos(theta);
-	point.y = rho * sin(phi) * sin(theta);
-	point.z = rho * cos(phi);
-	return point;
-}
-
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
@@ -585,16 +577,52 @@ void init()
 		std::vector<glm::vec3> points = std::vector<glm::vec3>();
 		srand((unsigned int)time(NULL));
 		int numPoints = 1000;
-		float rho = 1.0;
 		
 		for_int(i, numPoints)
 		{
-			float theta = 2 * PI * ((float)rand() / RAND_MAX);//random range is 0.0 to 1.0
-			float phi = acos(2.0f * ((float)rand() / RAND_MAX) - 1.0f);
-			glm::vec3 point = sphereToCartesian(rho, theta, phi);
+			glm::vec3 point = glm::sphericalRand(1.0);
 			points.push_back(point);
-			writePointCloud("src/sphere.pcd", numPoints, points);
 		}
+
+		writePointCloud("src/sphere.pcd", numPoints, points);
+	}
+
+	if (false)
+	{
+		std::vector<glm::vec3> points = std::vector<glm::vec3>();
+		srand((unsigned int)time(NULL));
+		int numPoints = 1000;
+
+		for_int(i, numPoints)
+		{
+			glm::vec2 planar = glm::linearRand(glm::vec2(-1.0), glm::vec2(1.0));
+			int side = rand() % 6;
+			glm::vec3 point = glm::vec3();
+			switch (side)
+			{
+			case 0:
+				point = glm::vec3(planar.x, planar.y, -1);
+				break;
+			case 1:
+				point = glm::vec3(planar.x, planar.y, 1);
+				break;
+			case 2:
+				point = glm::vec3(planar.x, -1, planar.y);
+				break;
+			case 3:
+				point = glm::vec3(planar.x, 1, planar.y);
+				break;
+			case 4:
+				point = glm::vec3(-1, planar.x, planar.y);
+				break;
+			case 5:
+				point = glm::vec3(1, planar.x, planar.y);
+				break;
+			}
+			points.push_back(point);
+		}
+
+		writePointCloud("src/cube.pcd", numPoints, points);
 	}
 
 	// load the shader programs
@@ -614,12 +642,9 @@ void init()
 	StaticEntity* pc = new StaticEntity(scene->GetModel("sphere"));
 
 	numVertices = pointCloud->Vertices();
+	radius = pc->BoundingRadius() * 2.1f;
+	setUniform("radiusOffset", radius - pc->BoundingRadius());
 	samplingDensity = INFINITY;
-	//samplingDensity = numVertices / pointCloud->BoundingRadius();
-	//samplingDensity = numVertices / (pow(pointCloud->BoundingRadius(), 2));
-	//samplingDensity = 2.f;
-	//samplingDensity = numVertices / (pow(pointCloud->BoundingRadius(), 3));
-	//samplingDensity = numVertices / ((4.f / 3.f) * PI * pow(pointCloud->BoundingRadius(), 3));
 	printf("Sampling Density %3f\n", samplingDensity);
 
 	sprintf(pointClousdStr, "  Point Cloud %s", pointCloud->File());
@@ -808,6 +833,23 @@ void mouseState(int button, int state, int x, int y)
 	{
 		rotate = false;
 	}
+
+	// Zoom
+	if (button == 3 || button == 4)
+	{
+		if (state == GLUT_UP) return;
+		float minRadius = pointCloud->BoundingRadius();
+		float increment = minRadius / 10.0f;
+		radius += button == 3 ? -increment : increment;
+		radius = glm::clamp(radius, minRadius, minRadius * 10);
+		setUniform("radiusOffset", radius - minRadius);
+
+		float eyeX = radius * sin(theta) * cos(phi);
+		float eyeY = radius * -sin(phi);
+		float eyeZ = radius * cos(theta) * cos(phi);
+
+		((DynamicCamera*)viewingCamera)->SetEyeOffset(glm::vec3(eyeX, eyeY, eyeZ));
+	}
 }
 
 void mouseMove(int x, int y)
@@ -825,25 +867,25 @@ void mouseMove(int x, int y)
 			theta -= (mouseOldX - x) * 0.01f;
 		}
 
-		if (abs(theta) >= 2 * PI)
+		if (std::abs(theta) >= 2 * PI)
 		{
 			theta = 0;
 		}
 
 		// Get phi radians
 		phi += (mouseOldY - y) * 0.01f;
-		if (abs(phi) >= 2 * PI)
+		if (std::abs(phi) >= 2 * PI)
 		{
 			phi = 0;
 		}
 
 		// Have camera up be world down if it goes over the top of object
 		// prevents weird flipping
-		if (abs(phi) >= PI / 2 && abs(phi) <= 3 * PI / 2)
+		if (std::abs(phi) >= PI / 2 && std::abs(phi) <= 3 * PI / 2)
 		{
 			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, -1.0f, 0.0f));
 		}
-		else if (abs(phi) < PI / 2 || abs(phi) > 3 * PI / 2)
+		else if (std::abs(phi) < PI / 2 || std::abs(phi) > 3 * PI / 2)
 		{
 			((DynamicCamera*)viewingCamera)->SetUp(glm::vec3(0.0f, 1.0f, 0.0f));
 		}
@@ -870,11 +912,9 @@ int main(int argc, char* argv[])
 # endif
 # ifndef __Mac__
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
-# endif
 	glutInitWindowSize(800, 600);
 	// set OpenGL and GLSL versions to 3.3 for Comp 465/L, comment to see highest versions
-# ifndef __Mac__
-	glutInitContextVersion(3, 3);
+	//glutInitContextVersion(3, 3);
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 # endif
 	glutCreateWindow("");

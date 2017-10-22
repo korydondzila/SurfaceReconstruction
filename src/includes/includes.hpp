@@ -25,7 +25,10 @@ Mike Barnes
 // defines and includes
 #ifndef __INCLUDES__
 # define __INCLUDES__
+# define GLM_FORCE_INLINE
+# define GLM_FORCE_ONLY_XYZW
 # define GLM_FORCE_PURE  // for latest version of GLM w/ error C2719: ,,,  __declspec(align('16')) won't be aligned
+# define GLM_FORCE_CXX98
 # define BUFFER_OFFSET(x)  ((const GLvoid *) (x))  // OpenGL PG 8th ed. code, in vgl.h 
 # define MAX_INFO_LOG_SIZE 2048  // for error messages in loadShaders(...)
 
@@ -63,6 +66,7 @@ Mike Barnes
 # include <glm/gtc/matrix_transform.hpp>
 # include <glm/gtc/type_ptr.hpp>
 # include <glm/gtx/quaternion.hpp>
+# include <glm/gtc/random.hpp>
 # include "glmUtils.hpp"  // print matrices and vectors, ... 
 # include "shader.hpp"    // load vertex and fragment shaders
 # include "pointCloudLoader.hpp"  // load AC3D *.tri model 

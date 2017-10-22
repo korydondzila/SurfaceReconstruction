@@ -39,7 +39,7 @@ namespace HuguesHoppe
 		if (!present) return;
 		for (const Node& e : cell)
 		{
-			PQNode<Node>& node = PQNode<Node>(e, glm::distance2(pcenter, *e.p));
+			PQNode<Node> node = PQNode<Node>(e, glm::distance2(pcenter, *e.p));
 			pq.push(node);
 		}
 	}

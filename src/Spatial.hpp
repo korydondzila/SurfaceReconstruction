@@ -36,7 +36,7 @@ namespace HuguesHoppe
 
 	using SPriority_Queue = std::priority_queue<PQNode<Node>, std::vector<PQNode<Node>>, cmp>;
 
-	using Ind = glm::ivec3;
+	using Ind = glm::vec3;
 
 	// Spatial data structure for efficient queries like "closest_elements" or "find_elements_intersecting_ray".
 	class Spatial : noncopyable // abstract class
@@ -59,7 +59,7 @@ namespace HuguesHoppe
 		float index_to_float(int i) const { return i*_gni; }
 		Ind point_to_indices(const glm::vec3& p) const { Ind ci; for_int(c,3) { ci[c] = float_to_index(c, p[c]); } return ci; }
 		glm::vec3 indices_to_point(const Ind& ci) const { glm::vec3 p; for_int(c, 3) { p[c] = index_to_float(ci[c]); } return p; }
-		int encode(const Ind& ci) const { return (ci[0] << 20) | (ci[1] << 10) | ci[2]; } // k_max_gn implied here
+		int encode(const Ind& ci) const { return (int(ci[0]) << 20) | (int(ci[1]) << 10) | int(ci[2]); } // k_max_gn implied here
 		Ind decode(int en) const;
 		// for BSpatialSearch:
 		// Add elements from cell ci to priority queue with priority equal to distance from pcenter squared.
@@ -120,8 +120,7 @@ namespace HuguesHoppe
 	inline int Spatial::float_to_index(int axis, float fd) const
 	{
 		float f = fd, min = _boxBounds[0][axis], max = _boxBounds[1][axis];
-		float dis = (max - min) / 100;
-		dis = 0.1f;
+		float dis = 0.1f;
 		if (f <= min + dis) { assert(f >= min - dis); f = min + dis; }
 		if (f >= max - dis) { assert(f <= max + dis); f = max - dis; }
 

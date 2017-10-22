@@ -2,7 +2,7 @@
 #ifndef CONTOUR_H
 #define CONTOUR_H
 
-#include "includes\includes.hpp"
+#include "includes/includes.hpp"
 #include "Mesh.hpp"
 
 namespace HuguesHoppe
@@ -219,8 +219,7 @@ namespace HuguesHoppe
 			int float_to_index(int axis, float fd) const
 			{
 				float f = fd, min = _boxBounds[0][axis], max = _boxBounds[1][axis];
-				float dis = (max - min) / 100;
-				dis = 0.1f;
+				float dis = 0.1f;
 				if (f <= min + dis) { assert(f >= min - dis); f = min + dis; }
 				if (f >= max - dis) { assert(f <= max + dis); f = max - dis; }
 

@@ -41,8 +41,8 @@ void PointCloud::Init()
 
 void PointCloud::OutputPoints()
 {
-	for each (glm::vec3 point in *m_vPoints)
+	for(int i = 0; i < m_iVertices; i++)
 	{
-		showVec3("", point);
+		showVec3("", (*m_vPoints)[i]);
 	}
 }

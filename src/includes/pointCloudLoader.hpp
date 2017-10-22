@@ -190,9 +190,9 @@ inline bool writePointCloud(char* fileName, int nVertices, const std::vector<glm
 	{
 		fprintf(fileOut, "%d\n", nVertices);
 
-		for each (glm::vec3 point in points)
+		for(int i = 0; i < nVertices; i++)
 		{
-			fprintf(fileOut, "%f %f %f\n", point.x, point.y, point.z);
+			fprintf(fileOut, "%f %f %f\n", points[i].x, points[i].y, points[i].z);
 		}
 
 		fclose(fileOut);

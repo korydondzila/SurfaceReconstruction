@@ -2,7 +2,7 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-#include "includes\includes.hpp"
+#include "includes/includes.hpp"
 #include "UnionFind.hpp"
 
 namespace HuguesHoppe
