@@ -49,8 +49,7 @@ using namespace HuguesHoppe;
 
 // constants for models:  file names, vertex count, model display size
 const int nModels = 4;  // number of models in this scene
-char * modelFile[nModels] = { "src/knot.pcd" };
-const int nVertices[nModels] = { 1280 };
+char * modelFile[nModels] = { "src/sphere1k.pcd" };
 char * vertexShaderFile = "src/simpleVertex.glsl";
 char * fragmentShaderFile = "src/simpleFragment.glsl";
 
@@ -63,6 +62,7 @@ GLuint vao;
 
 // Point cloud information
 PointCloud* pointCloud;  // The loaded point cloud
+StaticEntity* pc;
 Vec2<glm::vec3> pcBoxBound;
 int numVertices, numContourVertices; // number of vertices/points
 std::vector<glm::vec3> points; // The point cloud points
@@ -77,7 +77,8 @@ std::unique_ptr<Graph<int>> gpcpath; // path of orientation propagation
 Mesh mesh;
 int minkintp = 4, maxkintp = 20, gridsize = 10; // Min/Max number of points in tangent plane
 float samplingDensity = 0.0f; // Sampling density
-bool showUnorientTP = false, showOrientTP = false, showContour = false, cullFace = true;
+bool showPointCloud = true, showUnorientTP = false, showOrientTP = false,
+showContour = false, cullFace = true;
 
 // model, view, projection matrices and values to create modelMatrix.
 glm::mat4 modelMatrix;          // set in display()
@@ -168,8 +169,11 @@ void display()
 		ModelViewProjectionMatrix = projectionMatrix * modelViewMatrix;
 		glUniformMatrix4fv(MVP, 1, GL_FALSE, glm::value_ptr(ModelViewProjectionMatrix));
 
-		glBindVertexArray(*(entity->ModelFile()->VAO()));
-		glDrawArrays(GL_POINTS, 0, entity->ModelFile()->Vertices());
+		if (showPointCloud)
+		{
+			glBindVertexArray(*(entity->ModelFile()->VAO()));
+			glDrawArrays(GL_POINTS, 0, entity->ModelFile()->Vertices());
+		}
 
 		if (showUnorientTP)
 		{
@@ -213,7 +217,7 @@ void update(int value)
 
 	viewingCamera = scene->ViewingCamera();
 	viewMatrix = viewingCamera->ViewMatrix();
-	setUniform("cameraPos", glm::vec3(viewMatrix * glm::vec4(viewingCamera->Eye(),1)));
+	setUniform("cameraPos", glm::vec3(viewMatrix * glm::vec4(viewingCamera->Eye(), 1)));
 
 	updateCount++;
 	currentTime = glutGet(GLUT_ELAPSED_TIME);
@@ -237,7 +241,7 @@ void compute_tp(int i, int& n, glm::mat4x3& f)
 	for (;;) {
 		assert(!ss.done());
 		float distanceSquared; int pointId = ss.next(&distanceSquared);
-		if ((int(pointArray.size()) >= minkintp && distanceSquared > square(samplingDensity)) || int(pointArray.size()) >= maxkintp) break;
+		if ((int(pointArray.size()) <= minkintp && distanceSquared > square(samplingDensity)) || int(pointArray.size()) >= maxkintp) break;
 		pointArray.push_back(points[pointId]);
 		if (pointId != i && !gpcpseudo->contains(i, pointId)) gpcpseudo->enter_undirected(i, pointId);
 	}
@@ -405,7 +409,7 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 		if (proj[i] < pcBoxBound[0][i] - dis || proj[i] > pcBoxBound[1][i] + dis)
 			return k_Contour_undefined;
 	}
-	
+
 	// check that projected point is close to a data point
 	SpatialSearch ss2(*SPp, proj);
 	float dis2; ss2.next(&dis2);
@@ -424,7 +428,7 @@ float compute_signed(const glm::vec3& p, glm::vec3& proj)
 	// This may be required
 	//if (dis3>grid_diagonal2*square(fudge))
 	//	return k_Contour_undefined;
-	
+
 	return dis;
 }
 
@@ -568,6 +572,39 @@ void makeContour(GLuint vao, GLuint vbo)
 	free(normal);
 }
 
+glm::vec3 sphereToCartesian(float rho, float theta, float phi)
+{
+	glm::vec3 point = glm::vec3();
+	point.x = rho * sin(phi) * cos(theta);
+	point.y = rho * sin(phi) * sin(theta);
+	point.z = rho * cos(phi);
+	return point;
+}
+
+std::string getName(const char* fileName)
+{
+	std::string file = fileName;
+	size_t f1 = file.find_last_of('/');
+	size_t f2 = file.find_last_of('.');
+	return file.substr(f1 + 1, f2 - f1 - 1);
+}
+
+bool writeTimes(float tpTime, float orientTime, float contourTime)
+{
+	FILE* fileOut;
+	fileOut = fopen("times.txt", "a");
+	std::string model = getName(pointCloud->File());
+
+	if (fileOut != NULL)
+	{
+		fprintf(fileOut, "%s false %d %d %f %f %f\n", model.c_str(), numVertices, gridsize, tpTime, orientTime, contourTime);
+		fclose(fileOut);
+		return true;
+	}
+
+	return false;
+}
+
 // load the shader programs, vertex data from model files, create the solids, set initial view
 void init()
 {
@@ -576,26 +613,29 @@ void init()
 	{
 		std::vector<glm::vec3> points = std::vector<glm::vec3>();
 		srand((unsigned int)time(NULL));
-		int numPoints = 1000;
-		
+		int numPoints = 100000;
+		float rho = 1.0f;
+
 		for_int(i, numPoints)
 		{
-			glm::vec3 point = glm::sphericalRand(1.0);
+			float theta = 2 * PI * ((float)rand() / RAND_MAX);//random range is 0.0 to 1.0
+			float phi = acos(2.0f * ((float)rand() / RAND_MAX) - 1.0f);
+			glm::vec3 point = sphereToCartesian(rho, theta, phi);
 			points.push_back(point);
 		}
 
-		writePointCloud("src/sphere.pcd", numPoints, points);
+		writePointCloud("src/sphere100k.pcd", numPoints, points);
 	}
 
 	if (false)
 	{
 		std::vector<glm::vec3> points = std::vector<glm::vec3>();
 		srand((unsigned int)time(NULL));
-		int numPoints = 1000;
+		int numPoints = 1000000;
 
 		for_int(i, numPoints)
 		{
-			glm::vec2 planar = glm::linearRand(glm::vec2(-1.0), glm::vec2(1.0));
+			glm::vec2 planar = glm::vec2((float)rand() / RAND_MAX * 2.0f - 1.0f, (float)rand() / RAND_MAX * 2.0f - 1.0f);
 			int side = rand() % 6;
 			glm::vec3 point = glm::vec3();
 			switch (side)
@@ -622,7 +662,7 @@ void init()
 			points.push_back(point);
 		}
 
-		writePointCloud("src/cube.pcd", numPoints, points);
+		writePointCloud("src/cube1m.pcd", numPoints, points);
 	}
 
 	// load the shader programs
@@ -636,10 +676,10 @@ void init()
 	// Load models
 	for (int i = 0; i < 1; i++)
 	{
-		pointCloud = new PointCloud("src/sphere.pcd", &VAO[i], &buffer[i], &shaderProgram);
+		pointCloud = new PointCloud(modelFile[i], &VAO[i], &buffer[i], &shaderProgram);
 	}
 
-	StaticEntity* pc = new StaticEntity(scene->GetModel("sphere"));
+	pc = new StaticEntity(scene->GetModel(getName(pointCloud->File())));
 
 	numVertices = pointCloud->Vertices();
 	radius = pc->BoundingRadius() * 2.1f;
@@ -671,7 +711,8 @@ void init()
 	double time = glutGet(GLUT_ELAPSED_TIME);
 	process_principal(); // Compute the tangent planes
 	double end = glutGet(GLUT_ELAPSED_TIME);
-	printf("Process Principal: %3f\n", ((end - time) / 1000));
+	double tpTime = end - time;
+	printf("Process Principal: %3f\n", (tpTime / 1000));
 
 	// Create unoriented tangent planes
 	makeTangentPlanes(VAO[1], buffer[1]);
@@ -682,7 +723,8 @@ void init()
 	time = glutGet(GLUT_ELAPSED_TIME);
 	orient_tp(); // Orient tangent planes
 	end = glutGet(GLUT_ELAPSED_TIME);
-	printf("Orient Tangent Planes: %3f\n", ((end - time) / 1000));
+	double orientTime = end - time;
+	printf("Orient Tangent Planes: %3f\n", (orientTime / 1000));
 	gpcpseudo.reset();
 
 	// Create oriented tangent planes
@@ -692,7 +734,10 @@ void init()
 	Contour3DMesh<eval_point> contour(gridsize, pcBoxBound, &mesh);
 	contour_3D(contour);
 	end = glutGet(GLUT_ELAPSED_TIME);
-	printf("Contour: %3f\n", ((end - time) / 1000));
+	double contourTime = end - time;
+	printf("Contour: %3f\n", (contourTime / 1000));
+
+	writeTimes(tpTime, orientTime, contourTime);
 
 	// Create oriented tangent planes
 	makeContour(VAO[3], buffer[3]);
@@ -738,6 +783,7 @@ void keyboard(unsigned char key, int x, int y)
 		showUnorientTP = false;
 		showOrientTP = false;
 		showContour = false;
+		showPointCloud = !showPointCloud;
 		break;
 
 	case '2': // Toggle unoriented TPs
@@ -838,7 +884,7 @@ void mouseState(int button, int state, int x, int y)
 	if (button == 3 || button == 4)
 	{
 		if (state == GLUT_UP) return;
-		float minRadius = pointCloud->BoundingRadius();
+		float minRadius = pc->BoundingRadius();
 		float increment = minRadius / 10.0f;
 		radius += button == 3 ? -increment : increment;
 		radius = glm::clamp(radius, minRadius, minRadius * 10);
@@ -946,19 +992,28 @@ int main(int argc, char* argv[])
 	printf("LINUX\n");
 #endif
 
+	if (argc > 1)
+	{
+		modelFile[0] = argv[1];
+		gridsize = atoi(argv[2]);
+	}
+
 	// initialize scene
 	init();
 	// set glut callback functions
-	glutDisplayFunc(display);
-	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboard);
-	glutMouseFunc(mouseState);
-	glutMotionFunc(mouseMove);
-	glutSpecialFunc(specialKeys);
-	glutSpecialUpFunc(specialUpFunc);
-	glutTimerFunc(scene->TimerDelay(), update, 1);
-	glutIdleFunc(display);
-	glutMainLoop();
+	if (argc <= 1)
+	{
+		glutDisplayFunc(display);
+		glutReshapeFunc(reshape);
+		glutKeyboardFunc(keyboard);
+		glutMouseFunc(mouseState);
+		glutMotionFunc(mouseMove);
+		glutSpecialFunc(specialKeys);
+		glutSpecialUpFunc(specialUpFunc);
+		glutTimerFunc(scene->TimerDelay(), update, 1);
+		glutIdleFunc(display);
+		glutMainLoop();
+	}
 	printf("done\n");
 	delete scene;
 	return 0;

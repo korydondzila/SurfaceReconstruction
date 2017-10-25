@@ -240,3 +240,13 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+src/torus1m.pcd
+src/sphere100k.pcd
+src/cube1m.pcd
+src/car1m.pcd
+src/torus10k.pcd
+src/torus100k.pcd
+src/car100k.pcd
+src/sphere1m.pcd
+src/sphere10k.pcd
+src/car10k.pcd

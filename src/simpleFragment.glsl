@@ -21,7 +21,7 @@ uniform float radiusOffset = 0.0f;
 
 void main()
 {
-	float dist = distance(cameraPos.z, vs_worldPos.z) - radiusOffset;
+	float dist = distance(cameraPos, vs_worldPos) - radiusOffset;
 	dist = min(2.0f, dist);
 	dist = max(0.0f, dist);
 	fragColor = vec4(max(sin(dist * HPI + HPI), 0), max(sin(dist * HPI - 0.0f), 0), max(sin(dist * HPI - HPI), 0), 1.0f);
